@@ -3,10 +3,10 @@ from __future__ import annotations
 import requests
 
 from .config import AppConfig
+from .vault_state import state_dir
 
 
-def summarize_with_ollama(config: AppConfig, title: str, url: str, text: str) -> str:
-    prompt = f"""
+DEFAULT_SUMMARY_PROMPT = """
 You summarize bookmarked resources for an Obsidian knowledge vault.
 
 Return Korean Markdown with these sections:
@@ -21,12 +21,46 @@ Return Korean Markdown with these sections:
 - Suggested folder: one short path
 - Suggested tags: 3-8 lowercase tags
 
-Title: {title}
-URL: {url}
+Title: {{title}}
+URL: {{url}}
 
 Source text:
-{text[:12000]}
+{{source_text}}
 """.strip()
+
+
+def prompt_path(config: AppConfig):
+    return state_dir(config) / "summary-prompt.md"
+
+
+def read_summary_prompt(config: AppConfig) -> str:
+    path = prompt_path(config)
+    if not path.exists():
+        return DEFAULT_SUMMARY_PROMPT
+    text = path.read_text(encoding="utf-8-sig").strip()
+    return text or DEFAULT_SUMMARY_PROMPT
+
+
+def write_summary_prompt(config: AppConfig, prompt: str) -> None:
+    path = prompt_path(config)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text((prompt or DEFAULT_SUMMARY_PROMPT).strip() + "\n", encoding="utf-8")
+
+
+def render_prompt(template: str, *, title: str, url: str, text: str) -> str:
+    source_text = text[:12000]
+    rendered = (
+        template.replace("{{title}}", title or "")
+        .replace("{{url}}", url or "")
+        .replace("{{source_text}}", source_text)
+    )
+    if "{{source_text}}" not in template:
+        rendered = f"{rendered.rstrip()}\n\nSource text:\n{source_text}"
+    return rendered.strip()
+
+
+def summarize_with_ollama(config: AppConfig, title: str, url: str, text: str) -> str:
+    prompt = render_prompt(read_summary_prompt(config), title=title, url=url, text=text)
 
     response = requests.post(
         f"{config.ollama.base_url}/api/generate",

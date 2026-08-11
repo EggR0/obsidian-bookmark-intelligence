@@ -63,6 +63,22 @@
         <input id="poll-interval" type="number" min="1" max="60" step="1">
       </section>
 
+      <section>
+        <h2>Summary prompt</h2>
+        <p class="hint">Available variables: {{title}}, {{url}}, {{source_text}}</p>
+        <textarea id="summary-prompt" spellcheck="false"></textarea>
+        <div class="row">
+          <button id="save-prompt-button" type="button">Save prompt</button>
+          <button id="reset-prompt-button" type="button" class="secondary">Reset prompt</button>
+        </div>
+        <dl>
+          <div>
+            <dt>Prompt file</dt>
+            <dd id="prompt-path">Unknown</dd>
+          </div>
+        </dl>
+      </section>
+
       <footer>
         <button id="save-button" type="button">Save settings</button>
         <button id="poll-button" type="button" class="secondary">Check activity now</button>

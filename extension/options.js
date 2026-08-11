@@ -9,13 +9,19 @@ const notifySucceeded = document.getElementById("notify-succeeded");
 const notifyFailed = document.getElementById("notify-failed");
 const activityPollingEnabled = document.getElementById("activity-polling-enabled");
 const pollInterval = document.getElementById("poll-interval");
+const summaryPrompt = document.getElementById("summary-prompt");
 const vaultPath = document.getElementById("vault-path");
 const ollamaModel = document.getElementById("ollama-model");
 const profileId = document.getElementById("profile-id");
+const promptPath = document.getElementById("prompt-path");
 const openDownloadButton = document.getElementById("open-download-button");
 const testNativeButton = document.getElementById("test-native-button");
 const saveButton = document.getElementById("save-button");
 const pollButton = document.getElementById("poll-button");
+const savePromptButton = document.getElementById("save-prompt-button");
+const resetPromptButton = document.getElementById("reset-prompt-button");
+
+let defaultSummaryPrompt = "";
 
 function sendMessage(message) {
   if (isPromiseApi) {
@@ -102,6 +108,36 @@ async function testNativeHost() {
   }
 }
 
+async function loadAgentSettings() {
+  const response = await sendMessage({ type: "get-agent-settings" });
+  if (!response || !response.ok) {
+    throw new Error((response && response.error) || "Could not load agent settings");
+  }
+  summaryPrompt.value = response.summary_prompt || "";
+  defaultSummaryPrompt = response.default_summary_prompt || response.summary_prompt || "";
+  promptPath.textContent = response.summary_prompt_path || "Unknown";
+  vaultPath.textContent = response.vault_path || vaultPath.textContent;
+  ollamaModel.textContent = response.ollama_model || ollamaModel.textContent;
+}
+
+async function saveSummaryPrompt() {
+  savePromptButton.disabled = true;
+  statusText.textContent = "Saving summary prompt...";
+  try {
+    const response = await sendMessage({
+      type: "save-agent-settings",
+      summaryPrompt: summaryPrompt.value
+    });
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || "Could not save summary prompt");
+    }
+    promptPath.textContent = response.summary_prompt_path || promptPath.textContent;
+    statusText.textContent = "Summary prompt saved.";
+  } finally {
+    savePromptButton.disabled = false;
+  }
+}
+
 openDownloadButton.addEventListener("click", () => {
   const url = agentDownloadUrl.value.trim() || "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest";
   window.open(url, "_blank", "noopener,noreferrer");
@@ -129,7 +165,19 @@ pollButton.addEventListener("click", () => {
     });
 });
 
+savePromptButton.addEventListener("click", () => {
+  saveSummaryPrompt().catch((error) => {
+    statusText.textContent = String(error && error.message ? error.message : error);
+  });
+});
+
+resetPromptButton.addEventListener("click", () => {
+  summaryPrompt.value = defaultSummaryPrompt;
+  statusText.textContent = "Default prompt restored in the editor. Save to apply.";
+});
+
 loadSettings()
+  .then(loadAgentSettings)
   .then(testNativeHost)
   .catch((error) => {
     statusText.textContent = String(error && error.message ? error.message : error);

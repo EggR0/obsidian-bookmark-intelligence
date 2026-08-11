@@ -63,13 +63,30 @@ label.check {
 }
 
 input[type="url"],
-input[type="number"] {
+input[type="number"],
+textarea {
   width: 100%;
-  min-height: 36px;
   border: 1px solid #b9c3d1;
   border-radius: 6px;
   padding: 6px 8px;
   font: inherit;
+}
+
+input[type="url"],
+input[type="number"] {
+  min-height: 36px;
+}
+
+textarea {
+  min-height: 320px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+}
+
+.hint {
+  color: #5b6472;
+  margin-bottom: 10px;
 }
 
 .row,

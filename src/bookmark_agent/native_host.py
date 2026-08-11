@@ -8,6 +8,7 @@ import sys
 from .bookmark_import import ImportFilters, import_bookmarks
 from .config import AppConfig
 from .service import ingest_bookmark_event
+from .summarizer import DEFAULT_SUMMARY_PROMPT, prompt_path, read_summary_prompt, write_summary_prompt
 from .vault_state import state_dir
 
 
@@ -64,6 +65,30 @@ def _recent_activity(config: AppConfig, after: str | None = None, limit: int = 2
 
 def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
     command = message.get("command")
+    if command == "get-agent-settings":
+        return {
+            "ok": True,
+            "command": command,
+            "vault_path": str(config.obsidian.vault_path),
+            "database_path": str(config.database.path),
+            "notes_subdir": config.obsidian.notes_subdir,
+            "ollama_model": config.ollama.model,
+            "summary_prompt": read_summary_prompt(config),
+            "default_summary_prompt": DEFAULT_SUMMARY_PROMPT,
+            "summary_prompt_path": str(prompt_path(config)),
+        }
+
+    if command == "save-agent-settings":
+        prompt = message.get("summary_prompt")
+        if not isinstance(prompt, str):
+            return {"ok": False, "error": "summary_prompt must be a string"}
+        write_summary_prompt(config, prompt)
+        return {
+            "ok": True,
+            "command": command,
+            "summary_prompt_path": str(prompt_path(config)),
+        }
+
     if command == "import-bookmarks":
         mode = message.get("mode") or "index"
         if mode != "index":

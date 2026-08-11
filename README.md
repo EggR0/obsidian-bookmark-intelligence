@@ -458,8 +458,17 @@ notify_on_failure = true
 - 처리 실패 알림 사용 여부
 - worker 활동 로그 polling 사용 여부
 - polling 주기
+- 요약 입력 프롬프트
 
-이 설정은 브라우저 확장 storage에 저장됩니다. Obsidian Vault 경로, Ollama 모델, SQLite 경로 같은 agent 설정은 여전히 `config.toml`에서 관리합니다.
+확장 알림과 다운로드 URL 설정은 브라우저 extension storage에 저장됩니다. 요약 입력 프롬프트는 native host를 통해 Vault 내부 상태 폴더의 `summary-prompt.md`에 저장됩니다. 프롬프트에서는 `{{title}}`, `{{url}}`, `{{source_text}}` 변수를 사용할 수 있습니다. Obsidian Vault 경로, Ollama 모델, SQLite 경로 같은 agent 설정은 여전히 `config.toml`에서 관리합니다.
+
+### 로컬 모델 하드웨어 요구사항
+
+이 프로젝트는 요약을 클라우드 AI 서비스가 아니라 사용자의 로컬 Ollama 모델로 처리합니다. 따라서 선택한 모델을 실행할 수 있는 하드웨어가 필요합니다.
+
+기본 설정은 사용 가능한 경우 `qwen2.5:7b`를 사용합니다. 더 큰 모델은 더 많은 RAM/VRAM과 시간이 필요하고, GPU를 사용할 수 없으면 Ollama가 CPU fallback으로 느리게 처리하거나 모델 로드에 실패할 수 있습니다. 모델 로드 실패, Ollama 종료, timeout은 worker에서 `processing_failed`로 기록되고 재시도 대상이 됩니다.
+
+낮은 사양의 컴퓨터에서는 더 작은 Ollama 모델을 설정하는 것이 좋습니다.
 
 ### 추천 폴더와 태그
 

@@ -472,6 +472,63 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "get-agent-settings") {
+    return false;
+  }
+
+  withProfileId({
+    schema_version: 1,
+    command: "get-agent-settings",
+    source: {
+      browser: detectBrowser(),
+      extension: EXTENSION_NAME
+    },
+    event: {
+      type: "get-agent-settings",
+      timestamp: nowIso()
+    }
+  })
+    .then(sendNativeRequest)
+    .then((response) => sendResponse(response || { ok: false, error: "Empty native response" }))
+    .catch((error) => {
+      sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error)
+      });
+    });
+  return true;
+});
+
+api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "save-agent-settings") {
+    return false;
+  }
+
+  withProfileId({
+    schema_version: 1,
+    command: "save-agent-settings",
+    summary_prompt: message.summaryPrompt || "",
+    source: {
+      browser: detectBrowser(),
+      extension: EXTENSION_NAME
+    },
+    event: {
+      type: "save-agent-settings",
+      timestamp: nowIso()
+    }
+  })
+    .then(sendNativeRequest)
+    .then((response) => sendResponse(response || { ok: false, error: "Empty native response" }))
+    .catch((error) => {
+      sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error)
+      });
+    });
+  return true;
+});
+
 if (api.alarms && api.alarms.onAlarm) {
   api.alarms.onAlarm.addListener((alarm) => {
     if (alarm && alarm.name === ACTIVITY_ALARM) {
