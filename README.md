@@ -143,6 +143,112 @@ https://example.com/article
 
 최종 노트는 canonical URL 기준으로 하나만 만들고, 여러 브라우저 북마크가 같은 리소스를 가리킬 수 있습니다.
 
+### 작업 큐와 처리 상태
+
+북마크가 감지되거나 기존 북마크 import의 `summarize` 모드로 선택되면, 바로 요약을 시작하는 것이 아니라 먼저 SQLite 작업 큐에 들어갑니다.
+
+큐에 들어가는 시점은 다음과 같습니다.
+
+```text
+실시간 브라우저 북마크 생성/수정 이벤트
+  -> Native Host 수신
+  -> canonical URL 생성
+  -> 중복 URL 확인
+  -> resources 테이블에 pending 작업 등록
+
+기존 북마크 import summarize 모드
+  -> Chrome/Firefox 북마크 파일 스캔
+  -> 필터 적용
+  -> canonical URL 생성
+  -> 중복 URL 확인
+  -> resources 테이블에 pending 작업 등록
+```
+
+worker는 이 큐에서 `pending` 상태인 작업을 가져와 처리합니다.
+
+처리 상태는 다음처럼 바뀝니다.
+
+```text
+pending
+  -> processing
+  -> succeeded
+
+pending
+  -> processing
+  -> failed
+  -> retry time 도달
+  -> processing
+  -> succeeded 또는 failed
+```
+
+SQLite에 남는 주요 상태는 다음과 같습니다.
+
+- `process_status`: `pending`, `processing`, `succeeded`, `failed`
+- `retry_count`: 실패 횟수
+- `next_retry_at`: 다음 재시도 가능 시간
+- `last_error`: 마지막 실패 이유
+- `markdown_path`: 성공 시 생성된 Obsidian 노트 경로
+
+즉 브라우저 확장 프로그램은 북마크 이벤트를 놓치지 않게 큐에 넣는 역할이고, 실제 본문 추출과 요약은 worker가 순차적으로 처리합니다.
+
+### 삭제, 재추가, 이름 변경 동작
+
+이 시스템은 브라우저 북마크 항목과 요약 대상 리소스를 분리해서 봅니다.
+
+```text
+bookmarks 테이블
+  -> 브라우저별 북마크 항목 추적
+  -> browser + bookmark_id 기준
+  -> title, parent_id, status 기록
+
+resources 테이블
+  -> 실제 요약 대상 URL 추적
+  -> canonical_url 기준
+  -> process_status, retry_count, markdown_path 기록
+```
+
+같은 URL을 지웠다가 다시 북마크하면 다음처럼 동작합니다.
+
+```text
+북마크 삭제
+  -> bookmark_events에 removed 이벤트 기록
+  -> bookmarks 상태를 removed로 갱신
+  -> 기존 Obsidian 요약 노트는 삭제하지 않음
+  -> resources의 성공 기록도 유지
+
+같은 URL을 다시 북마크
+  -> 새 bookmark_id 또는 기존 bookmark_id가 active로 기록
+  -> canonical_url 기준으로 resources 중복 확인
+  -> 이미 succeeded 상태면 새 요약 노트를 만들지 않음
+  -> failed/pending 상태였으면 다시 처리 대상으로 둘 수 있음
+```
+
+즉 같은 글을 지웠다 다시 저장해도 Obsidian 노트가 계속 늘어나지 않습니다. 이미 요약된 canonical URL이면 기존 결과를 재사용하는 쪽이 기본값입니다.
+
+북마크 이름만 변경하면 다음처럼 동작합니다.
+
+```text
+북마크 제목 변경
+  -> bookmark_events에 changed 이벤트 기록
+  -> bookmarks.title 갱신
+  -> resources.title도 최신 제목으로 갱신 시도
+  -> 이미 succeeded 상태인 리소스는 자동 재요약하지 않음
+  -> 기존 Markdown 파일명도 자동 변경하지 않음
+```
+
+이름 변경만으로 원문 내용이 바뀐 것은 아니므로, 기본값은 재요약하지 않는 것입니다. 아직 처리 전인 `pending` 또는 실패 후 재시도 대상인 리소스라면, 나중에 worker가 처리할 때 최신 제목이 노트 제목으로 쓰일 수 있습니다.
+
+URL 자체가 바뀌면 이야기가 다릅니다.
+
+```text
+북마크 URL 변경
+  -> 새 canonical_url 계산
+  -> 새 URL이 기존에 처리된 적 없으면 pending 리소스로 등록
+  -> 기존 URL의 요약 노트는 자동 삭제하지 않음
+```
+
+자동 삭제와 자동 파일명 변경을 하지 않는 이유는 Obsidian 노트가 사용자가 읽고 수정할 수 있는 최종 지식 파일이기 때문입니다. 브라우저 북마크 조작만으로 이미 만든 노트를 지우거나 이름을 바꾸면 사용자가 추가한 메모를 잃을 수 있습니다.
+
 ### 웹페이지 요약 과정
 
 일반 웹페이지는 다음 순서로 처리됩니다.
@@ -173,7 +279,35 @@ YouTube URL
   -> Obsidian Markdown 저장
 ```
 
-자막을 가져올 수 없거나 YouTube 쪽에서 일시적으로 막으면, worker는 실패 상태를 기록하거나 제목/설명 기반 요약으로 후퇴합니다. 영상 자체는 저장하지 않습니다.
+자막을 가져올 수 없거나 YouTube 쪽에서 일시적으로 막혀도, 그 자체만으로 작업 전체를 실패 처리하지는 않습니다. worker는 가능한 경우 제목, 채널, 길이, 설명 같은 메타데이터를 사용해서 요약을 계속 진행합니다. 영상 자체는 저장하지 않습니다.
+
+자막 처리 방식은 다음과 같습니다.
+
+```text
+yt-dlp 메타데이터 조회 성공
+  -> 기입 자막 확인
+  -> 자동 생성 자막 확인
+  -> ko, en 우선으로 VTT 자막 다운로드 시도
+  -> 자막 성공: transcript 기반 요약
+  -> 자막 실패: metadata + description 기반 요약으로 후퇴
+```
+
+자막만 실패한 경우 요약 입력에는 다음 의미의 문장이 들어갑니다.
+
+```text
+Transcript unavailable; summarize from metadata and description.
+```
+
+이 경우에도 Obsidian 노트는 생성될 수 있습니다. 다만 실제 발화 내용이 빠지므로 자막 기반 요약보다 품질이 낮을 수 있습니다.
+
+작업 전체가 실패로 기록되는 경우는 별도입니다.
+
+- `yt-dlp`가 영상 정보 자체를 가져오지 못한 경우
+- YouTube 접근 오류가 메타데이터 조회 단계에서 발생한 경우
+- Ollama가 꺼져 있거나 설정된 모델이 없는 경우
+- Markdown 저장에 실패한 경우
+
+이때는 `processing_failed` 활동 로그가 남고, SQLite 큐에 `retry_count`, `next_retry_at`, `last_error`가 기록됩니다.
 
 ### Ollama 로컬 요약
 
@@ -187,6 +321,45 @@ endpoint = "http://localhost:11434/api/generate"
 ```
 
 Ollama가 꺼져 있거나 모델이 없으면 작업은 실패로 기록되고 재시도 대상이 됩니다. 클라우드 API 사용량, 광고, 일일 제한이 기본 구조에 들어가지 않습니다.
+
+Ollama 모델은 `/api/generate` 호출 시 Ollama가 로컬에서 로드합니다. 이미 메모리에 올라와 있으면 바로 응답하고, 아직 로드되지 않았다면 첫 요청에서 로드 시간이 걸릴 수 있습니다.
+
+GPU나 모델 로드 관련 상황은 다음처럼 처리됩니다.
+
+```text
+Ollama 실행 중 + 모델 설치됨 + 로드 성공
+  -> 정상 요약
+
+Ollama 실행 중 + 모델 설치됨 + GPU 사용 불가
+  -> Ollama가 CPU fallback을 할 수 있으면 느리게라도 요약
+  -> Ollama가 오류를 반환하면 worker는 failed로 기록
+
+Ollama 실행 중 + 모델 없음
+  -> /api/generate 실패
+  -> worker는 failed로 기록
+  -> retry_count 증가
+  -> next_retry_at 이후 재시도
+
+Ollama 꺼짐 또는 응답 없음
+  -> 요청 실패 또는 timeout
+  -> worker는 failed로 기록
+  -> retry_count 증가
+  -> next_retry_at 이후 재시도
+```
+
+이 프로젝트는 GPU 상태를 직접 제어하지 않습니다. GPU 사용 여부와 CPU fallback 여부는 Ollama 런타임이 결정합니다. agent는 Ollama가 성공 응답을 주면 요약을 저장하고, 오류나 timeout을 주면 실패로 기록하고 재시도합니다.
+
+설정된 모델이 설치되어 있는지는 `doctor` 명령에서 확인합니다.
+
+```powershell
+bookmark-agent --config .\config.toml doctor
+```
+
+모델이 없다면 먼저 내려받습니다.
+
+```powershell
+ollama pull qwen2.5:7b
+```
 
 ### 작업 진행 알림
 
@@ -212,6 +385,8 @@ processing_failed
 ```
 
 특히 `ollama_started`와 `ollama_completed`에는 사용한 Ollama 모델명이 들어갑니다.
+
+Ollama 호출에 실패하면 `processing_failed`에 실패 이유가 남습니다. 예를 들어 모델이 없거나, Ollama가 꺼져 있거나, timeout이 발생하면 `_Activity.md`와 `activity.jsonl`에서 확인할 수 있습니다.
 
 예시:
 
@@ -526,9 +701,47 @@ bookmark-agent --config .\config.toml worker
 3. `ollama list`에서 설정된 모델이 있는지 확인합니다.
 4. `.bookmark-agent`의 SQLite 큐에 실패 상태가 쌓였는지 확인합니다.
 
+### 작업이 큐에 들어갔는지 확인하고 싶을 때
+
+실시간 북마크 이벤트나 `import-bookmarks --mode summarize`로 선택된 URL은 SQLite의 `resources` 큐에 들어갑니다. 사용자가 직접 DB를 열지 않아도, 처리 시작과 결과는 다음 파일에서 확인할 수 있습니다.
+
+```text
+D:\obsidian\Bookmarks\_Activity.md
+D:\obsidian\.bookmark-agent\activity.jsonl
+```
+
+작업이 들어갔는데 요약이 늦는 경우에는 보통 다음 중 하나입니다.
+
+- worker가 아직 다음 polling 주기를 기다리는 중
+- Ollama가 모델을 처음 로드하는 중
+- GPU를 쓰지 못해 CPU로 느리게 처리 중
+- 이전 실패 작업이 `next_retry_at` 전이라 대기 중
+- 같은 canonical URL이 이미 처리되어 새 노트를 만들지 않은 상태
+
+### Ollama 또는 모델 로드가 실패할 때
+
+Ollama가 꺼져 있거나 모델 로드에 실패하면 해당 URL은 바로 버려지지 않습니다. worker는 실패 상태를 기록하고 재시도 시간을 잡습니다.
+
+확인할 위치:
+
+```text
+D:\obsidian\Bookmarks\_Activity.md
+D:\obsidian\.bookmark-agent\activity.jsonl
+```
+
+해결 순서:
+
+1. `ollama list`로 모델이 있는지 확인합니다.
+2. 없으면 `ollama pull qwen2.5:7b`로 설치합니다.
+3. Ollama가 실행 중인지 확인합니다.
+4. `bookmark-agent --config .\config.toml doctor`로 연결과 모델 상태를 확인합니다.
+5. GPU 문제라면 Ollama 로그를 확인합니다. agent는 GPU를 직접 고르지 않고 Ollama의 성공/실패 결과를 따릅니다.
+
 ### YouTube 자막이 비어 있을 때
 
-일부 영상은 자막이 없거나 자동 자막 접근이 제한될 수 있습니다. 이 경우 worker는 가능한 메타데이터와 설명을 사용하거나 실패 재시도 상태를 남깁니다.
+일부 영상은 자막이 없거나 자동 자막 접근이 제한될 수 있습니다. 자막만 실패한 경우에는 제목, 채널, 길이, 설명을 기반으로 요약을 계속 진행합니다. 이 경우 노트는 생성될 수 있지만, 실제 발화 내용이 빠져 요약 정확도가 낮아질 수 있습니다.
+
+반대로 `yt-dlp`가 영상 정보 자체를 가져오지 못하거나 Ollama 호출이 실패하면 작업은 `processing_failed`로 기록됩니다. 이 상태는 `D:\obsidian\Bookmarks\_Activity.md`와 `D:\obsidian\.bookmark-agent\activity.jsonl`에서 확인할 수 있습니다.
 
 ## 현재 검증된 동작
 
