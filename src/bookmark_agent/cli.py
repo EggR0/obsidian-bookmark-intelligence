@@ -14,7 +14,7 @@ from .installer import (
     detect_vault_path,
     doctor,
     install_worker_startup,
-    install_windows_registry,
+    install_native_manifest,
     open_extension_setup,
     write_config,
     write_native_manifest,
@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.manifest_dir).resolve(),
             chrome_extension_id=args.chrome_extension_id,
         )
-        registry_key = install_windows_registry(args.browser, manifest_path)
+        registry_key = install_native_manifest(args.browser, manifest_path)
         print(f"Wrote manifest: {manifest_path}")
         print(f"Registered: {registry_key}")
         return 0

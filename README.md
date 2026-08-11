@@ -21,10 +21,9 @@ Chrome과 Firefox 북마크를 로컬에서 감지하고, 중복을 정리한 �
 이 프로젝트는 Vault 경로를 하드코딩하지 않고 `config.toml`에서 지정합니다. Windows D: 드라이브 Vault 예시는 다음과 같습니다.
 
 ```toml
-[vault]
-path = "D:\\obsidian"
-notes_dir = "Bookmarks"
-state_dir = ".bookmark-agent"
+[obsidian]
+vault_path = "D:\\obsidian"
+notes_subdir = "Bookmarks"
 ```
 
 기본 결과 위치는 다음 구조입니다.
@@ -91,6 +90,14 @@ extension/
 ```
 
 빌드 스크립트가 Chrome용, Firefox용 산출물을 각각 만듭니다. 팝업에는 Native Host 연결 상태를 확인하는 `Test connection` 버튼이 있습니다.
+
+팝업에서 할 수 있는 동작은 다음과 같습니다.
+
+- `Test connection`: Native Host와 Vault 연결 상태 확인
+- `Preview existing bookmarks`: 기존 Chrome/Firefox 북마크 수량과 도메인 수 미리보기
+- `Create Obsidian index`: PowerShell 없이 기존 북마크 색인을 Obsidian에 생성
+
+여러 Chrome/Firefox 프로필을 사용하는 경우, 확장 프로그램 설치마다 `profile_id`를 로컬 storage에 생성해서 이벤트에 포함합니다. 따라서 같은 Windows 계정 안에서 Chrome 프로필을 여러 개 쓰더라도 `browser + profile_id + bookmark_id` 기준으로 북마크 항목이 분리됩니다.
 
 ### 기존 북마크 수천 개 가져오기
 
@@ -198,7 +205,7 @@ SQLite에 남는 주요 상태는 다음과 같습니다.
 ```text
 bookmarks 테이블
   -> 브라우저별 북마크 항목 추적
-  -> browser + bookmark_id 기준
+  -> browser + profile_id + bookmark_id 기준
   -> title, parent_id, status 기록
 
 resources 테이블
@@ -486,6 +493,62 @@ tags:
 
 ## 설치
 
+### 빠른 설치
+
+Windows에서는 `install.ps1`로 대부분의 설치 과정을 한 번에 실행할 수 있습니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -VaultPath D:\obsidian
+```
+
+이 스크립트가 처리하는 일은 다음과 같습니다.
+
+- Python 가상환경 생성 또는 재사용
+- Python 의존성 설치
+- `config.toml` 생성 또는 기존 설정 재사용
+- SQLite 초기화와 마이그레이션
+- Chrome/Firefox 확장 산출물 빌드
+- Native Host 실행 파일 빌드
+- Chrome/Firefox Native Messaging Host 등록
+- worker Windows 시작 프로그램 등록
+- `doctor` 실행
+- 확장 프로그램 설치 페이지 열기
+
+이미 `config.toml`이 있으면 기본적으로 덮어쓰지 않습니다. Vault 경로를 강제로 다시 쓰려면 `-ForceConfig`를 붙입니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -VaultPath D:\obsidian -ForceConfig
+```
+
+브라우저 설치 페이지를 열지 않으려면 `-SkipOpen`, 현재 세션에서 worker를 바로 시작하지 않으려면 `-SkipStartWorker`를 사용할 수 있습니다.
+
+Linux/mac에서는 `install.sh`를 사용할 수 있습니다.
+
+```bash
+chmod +x ./install.sh
+./install.sh --vault-path "$HOME/Obsidian"
+```
+
+이 스크립트는 Python 가상환경과 의존성을 준비하고, 확장 산출물을 만들고, Chrome/Firefox Native Messaging manifest를 사용자별 위치에 설치합니다.
+
+기본 Native Messaging manifest 설치 위치:
+
+```text
+Linux Chrome:  ~/.config/google-chrome/NativeMessagingHosts/obsidian_bookmark_agent.json
+Linux Firefox: ~/.mozilla/native-messaging-hosts/obsidian_bookmark_agent.json
+mac Chrome:    ~/Library/Application Support/Google/Chrome/NativeMessagingHosts/obsidian_bookmark_agent.json
+mac Firefox:   ~/Library/Application Support/Mozilla/NativeMessagingHosts/obsidian_bookmark_agent.json
+```
+
+worker 자동 실행:
+
+- Linux: user systemd가 있으면 user service를 등록하고, 없으면 XDG autostart 파일을 만듭니다.
+- macOS: LaunchAgent를 등록합니다.
+
+Unix 계열에서도 확장 프로그램 자체는 브라우저에서 한 번 수동으로 로드해야 합니다.
+
+### 수동 설치
+
 ### 1. Python 환경 준비
 
 Windows PowerShell에서 프로젝트 폴더로 이동한 뒤 실행합니다.
@@ -644,6 +707,8 @@ bookmark-agent --config .\config.toml worker
 .
   README.md
   SPEC.md
+  install.ps1
+  install.sh
   pyproject.toml
   config.example.toml
   extension/
@@ -676,7 +741,8 @@ bookmark-agent --config .\config.toml worker
 
 ## 보안과 개인정보
 
-- 확장 프로그램 권한은 `bookmarks`와 `nativeMessaging` 중심입니다.
+- 확장 프로그램 권한은 `bookmarks`, `nativeMessaging`, `storage` 중심입니다.
+- `storage`는 브라우저 프로필별 `profile_id`와 최근 연결 상태를 저장하는 데 사용합니다.
 - 확장 프로그램은 파일 시스템에 직접 접근하지 않습니다.
 - 로컬 에이전트는 설정된 Vault 경로 아래에만 상태와 Markdown을 씁니다.
 - Ollama 호출은 `localhost` 기준입니다.

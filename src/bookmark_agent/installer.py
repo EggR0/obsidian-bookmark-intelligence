@@ -162,6 +162,37 @@ def install_windows_registry(browser: str, manifest_path: Path) -> str:
     return rf"HKCU\{key_path}"
 
 
+def native_manifest_user_dir(browser: str) -> Path | None:
+    if os.name == "nt":
+        return None
+
+    home = Path.home()
+    if sys.platform == "darwin":
+        if browser == "chrome":
+            return home / "Library" / "Application Support" / "Google" / "Chrome" / "NativeMessagingHosts"
+        if browser == "firefox":
+            return home / "Library" / "Application Support" / "Mozilla" / "NativeMessagingHosts"
+    else:
+        if browser == "chrome":
+            return home / ".config" / "google-chrome" / "NativeMessagingHosts"
+        if browser == "firefox":
+            return home / ".mozilla" / "native-messaging-hosts"
+    raise ValueError(f"Unsupported browser: {browser}")
+
+
+def install_native_manifest(browser: str, manifest_path: Path) -> str:
+    if os.name == "nt":
+        return install_windows_registry(browser, manifest_path)
+
+    destination_dir = native_manifest_user_dir(browser)
+    if destination_dir is None:
+        raise RuntimeError("Native manifest directory could not be determined")
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    destination = destination_dir / f"{HOST_NAME}.json"
+    shutil.copy2(manifest_path, destination)
+    return str(destination)
+
+
 def install_worker_startup(command_path: Path) -> str:
     if os.name != "nt":
         raise RuntimeError("Worker startup install is only available on Windows")
@@ -299,14 +330,25 @@ def doctor(config: AppConfig, project_root: Path) -> list[CheckResult]:
     results.append(CheckResult("Native host cmd fallback", host_cmd.exists(), str(host_cmd)))
 
     for browser in ["chrome", "firefox"]:
-        registry_value = read_windows_registry(browser)
-        results.append(
-            CheckResult(
-                f"{browser.title()} registry",
-                bool(registry_value and Path(registry_value).exists()),
-                registry_value or "not registered",
+        if os.name == "nt":
+            registry_value = read_windows_registry(browser)
+            results.append(
+                CheckResult(
+                    f"{browser.title()} registry",
+                    bool(registry_value and Path(registry_value).exists()),
+                    registry_value or "not registered",
+                )
             )
-        )
+        else:
+            manifest_dir = native_manifest_user_dir(browser)
+            manifest_path = manifest_dir / f"{HOST_NAME}.json" if manifest_dir else None
+            results.append(
+                CheckResult(
+                    f"{browser.title()} native manifest",
+                    bool(manifest_path and manifest_path.exists()),
+                    str(manifest_path) if manifest_path else "not registered",
+                )
+            )
 
     worker_startup = read_worker_startup()
     results.append(CheckResult("Worker startup", bool(worker_startup), worker_startup or "not registered"))

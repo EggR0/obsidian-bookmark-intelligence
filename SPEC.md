@@ -54,12 +54,14 @@ Obsidian vault
 ### WebExtension
 
 - Runs in Chrome and Firefox from one shared JavaScript codebase.
+- Creates a local `profile_id` per extension installation so multiple Chrome/Firefox profiles do not collide.
 - Listens to:
   - `bookmarks.onCreated`
   - `bookmarks.onChanged`
   - `bookmarks.onMoved`
   - `bookmarks.onRemoved`
 - Sends small event payloads to the local native host.
+- Provides popup controls for Native Host connection testing and existing bookmark index creation.
 - Does not crawl webpages, call LLMs, or write files.
 
 ### Native Host
@@ -100,7 +102,8 @@ Final readable knowledge remains Markdown in Obsidian.
   "schema_version": 1,
   "source": {
     "browser": "chrome",
-    "extension": "obsidian-bookmark-intelligence"
+    "extension": "obsidian-bookmark-intelligence",
+    "profile_id": "59f3d6e1-3fb8-4dd1-b991-252f7bd2a9b2"
   },
   "event": {
     "type": "created",
@@ -137,17 +140,19 @@ Append-only event log mirror.
 | `id` | integer primary key | local event id |
 | `received_at` | text | UTC timestamp |
 | `browser` | text | chrome/firefox/unknown |
+| `profile_id` | text | browser profile or extension installation id |
 | `event_type` | text | created/changed/moved/removed |
 | `bookmark_id` | text | browser bookmark id |
 | `payload_json` | text | compact original event |
 
 ### `bookmarks`
 
-Current local bookmark view by browser and bookmark id.
+Current local bookmark view by browser, profile id, and bookmark id.
 
 | column | type | notes |
 | --- | --- | --- |
 | `browser` | text | part of primary key |
+| `profile_id` | text | part of primary key |
 | `bookmark_id` | text | part of primary key |
 | `url` | text | original URL |
 | `canonical_url` | text | normalized URL |
@@ -238,9 +243,27 @@ tags:
 - Suggested tags: bookmark, ai
 ```
 
+## Multi-Profile Model
+
+Chrome and Firefox can have multiple profiles under the same Windows user account. Browser bookmark ids are not globally unique across profiles, so the extension stores a random local `profile_id` in extension storage and sends it with every event.
+
+The local bookmark identity is:
+
+```text
+browser + profile_id + bookmark_id
+```
+
+The summary resource identity remains:
+
+```text
+canonical_url
+```
+
+This keeps browser profile state separate while still deduplicating the same URL into one Obsidian summary note.
+
 ## Security Model
 
-- The extension only requests `bookmarks` and `nativeMessaging`.
+- The extension only requests `bookmarks`, `nativeMessaging`, and `storage`.
 - The extension has no filesystem access.
 - The local agent writes only under the configured vault path for notes/state.
 - Native Messaging registration is explicit in HKCU registry keys.
@@ -258,3 +281,15 @@ tags:
 6. Run `bookmark-agent --config .\config.toml doctor`.
 7. Run `bookmark-agent --config .\config.toml worker`.
 8. Create or edit a bookmark and confirm Markdown appears in `D:\obsidian\Bookmarks`.
+
+On Windows, these steps can be automated with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -VaultPath D:\obsidian
+```
+
+On Linux/macOS, these steps can be automated with:
+
+```bash
+./install.sh --vault-path "$HOME/Obsidian"
+```
