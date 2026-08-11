@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Obsidian Bookmark Intelligence",
+  "version": "0.1.0",
+  "description": "Send bookmark changes to a local Obsidian bookmark intelligence agent.",
+  "permissions": [
+    "bookmarks",
+    "nativeMessaging",
+    "storage"
+  ],
+  "action": {
+    "default_title": "Obsidian Bookmark Intelligence",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArSzluIeJIVSllc6kDUsvVwJQ+Uv1j8V8/W/cd3JK7HHLvpuiJScn8CQQz2letpcQgSL8PQaQxWKCU1LcjMepYN7AC1lv6udQ/uunMCKYM0sFhUbu1tbxjxieeZIdE8BgzspjyaoPF0BMk7AxB2Ql+k1Sjx+kpzwYPx566MXVdaqJWhfDnlXhQr4owx0KlAVrvcNdR4O/i0+NSbVc5nqDHbn5wf4YLoAT3MFSVSfn1icMhRPbYR3F6N1muo3ti2cT+wOvNjNckRHFTCcixQsG+YODA19qkAKq6bUhjVHkm86Dt9y4NQyIWEWq4HMdoC5jx+lY3yPvooW5GjKcmmuYAwIDAQAB"
+}

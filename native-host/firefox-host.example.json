@@ -1,0 +1,9 @@
+{
+  "name": "obsidian_bookmark_agent",
+  "description": "Obsidian Bookmark Intelligence native messaging host",
+  "path": "C:\\\\ABSOLUTE\\\\PATH\\\\TO\\\\bookmark-agent-native.cmd",
+  "type": "stdio",
+  "allowed_extensions": [
+    "bookmark-to-obsidian@example.local"
+  ]
+}

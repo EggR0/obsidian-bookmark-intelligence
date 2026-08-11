@@ -1,0 +1,28 @@
+[database]
+path = "${vault}\\.bookmark-agent\\bookmark-agent.sqlite3"
+
+[obsidian]
+vault_path = "D:\\obsidian"
+notes_subdir = "Bookmarks"
+
+[ollama]
+base_url = "http://localhost:11434"
+model = "qwen2.5:7b"
+timeout_seconds = 120
+
+[processing]
+batch_size = 5
+max_retries = 3
+retry_backoff_seconds = 300
+store_extracted_text_in_sqlite = false
+
+[auto_move]
+enabled = false
+
+[browser_scan]
+enabled = false
+interval_seconds = 60
+
+[recommendations]
+default_folder = "Inbox/Bookmarks"
+default_tags = ["bookmark"]

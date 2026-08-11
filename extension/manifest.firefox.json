@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Obsidian Bookmark Intelligence",
+  "version": "0.1.0",
+  "description": "Send bookmark changes to a local Obsidian bookmark intelligence agent.",
+  "permissions": ["bookmarks", "nativeMessaging", "storage"],
+  "action": {
+    "default_title": "Obsidian Bookmark Intelligence",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "bookmark-to-obsidian@example.local"
+    }
+  }
+}

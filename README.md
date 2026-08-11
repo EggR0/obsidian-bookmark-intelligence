@@ -1,0 +1,481 @@
+# Obsidian Bookmark Intelligence
+
+Chrome과 Firefox 북마크를 로컬에서 감지하고, 중복을 정리한 뒤, 핵심 요약만 Obsidian Markdown 노트로 남기는 로컬 우선 북마크 정리 도구입니다.
+
+광고가 붙은 북마크 서비스나 일일 사용량 제한이 있는 클라우드 요약 서비스를 기본값으로 쓰지 않습니다. 브라우저 확장 프로그램, 로컬 에이전트, SQLite 작업 큐, Ollama, Obsidian Vault를 조합합니다.
+
+## 목표
+
+- Chrome과 Firefox에서 북마크 생성, 수정, 이동, 삭제 이벤트를 실시간 감지합니다.
+- Chrome/Firefox 공용 WebExtension 코드베이스를 사용합니다.
+- 기존 북마크 수천 개는 한 번에 색인화하고, 필요한 것만 골라 요약할 수 있습니다.
+- 웹페이지 본문 추출은 `trafilatura`를 재사용합니다.
+- YouTube는 `yt-dlp`로 메타데이터와 자막만 가져오며 영상 파일은 저장하지 않습니다.
+- 요약은 기본적으로 로컬 Ollama 모델을 사용합니다.
+- Obsidian에는 읽기 좋은 핵심 Markdown만 저장합니다.
+- SQLite는 Obsidian을 대체하는 DB가 아니라, 중복 방지와 재시도를 위한 내부 작업 큐로만 사용합니다.
+
+## 현재 기본 구성
+
+이 프로젝트는 Vault 경로를 하드코딩하지 않고 `config.toml`에서 지정합니다. Windows D: 드라이브 Vault 예시는 다음과 같습니다.
+
+```toml
+[vault]
+path = "D:\\obsidian"
+notes_dir = "Bookmarks"
+state_dir = ".bookmark-agent"
+```
+
+기본 결과 위치는 다음 구조입니다.
+
+```text
+D:\obsidian
+  Bookmarks\
+    _Index.md
+    _Inbox.md
+    by-domain\
+    요약된 북마크 노트.md
+  .bookmark-agent\
+    bookmark-agent.sqlite3
+    events.jsonl
+```
+
+`Bookmarks` 폴더는 사용자가 Obsidian에서 읽고 관리하는 최종 결과입니다. `.bookmark-agent` 폴더는 프로그램이 실패 재시도, 중복 제거, 처리 상태를 기억하기 위한 내부 상태입니다.
+
+## 전체 작동 방식
+
+```text
+Chrome / Firefox
+  -> WebExtension
+  -> Native Messaging
+  -> 로컬 Python 에이전트
+  -> URL 정규화와 중복 제거
+  -> SQLite 작업 큐
+  -> Worker
+  -> trafilatura 또는 yt-dlp
+  -> Ollama 로컬 요약
+  -> Obsidian Markdown
+```
+
+브라우저 확장 프로그램은 북마크 이벤트를 감지해서 로컬 에이전트에 전달하는 역할만 합니다. 웹페이지를 긁거나 파일을 쓰거나 요약을 만들지 않습니다.
+
+로컬 에이전트는 URL을 정규화하고 중복을 제거한 뒤, 처리할 작업을 큐에 넣습니다. Worker는 큐를 읽어 웹 본문이나 YouTube 자막을 가져오고, Ollama로 요약한 뒤, Obsidian 노트를 만듭니다.
+
+## 주요 기능
+
+### 실시간 북마크 감지
+
+확장 프로그램은 다음 브라우저 이벤트를 감지합니다.
+
+- `bookmarks.onCreated`: 새 북마크 생성
+- `bookmarks.onChanged`: 제목 또는 URL 수정
+- `bookmarks.onMoved`: 폴더 이동
+- `bookmarks.onRemoved`: 삭제
+
+이 이벤트는 작은 JSON 메시지로 로컬 Native Host에 전달됩니다. Native Host는 이벤트를 `events.jsonl`에 남기고, 처리 대상 URL을 SQLite 작업 큐에 등록합니다.
+
+### Chrome/Firefox 공용 확장 프로그램
+
+소스 코드는 `extension/`에 하나만 유지합니다.
+
+```text
+extension/
+  background.js
+  popup.html
+  popup.css
+  popup.js
+  manifest.chrome.json
+  manifest.firefox.json
+```
+
+빌드 스크립트가 Chrome용, Firefox용 산출물을 각각 만듭니다. 팝업에는 Native Host 연결 상태를 확인하는 `Test connection` 버튼이 있습니다.
+
+### 기존 북마크 수천 개 가져오기
+
+실시간 이벤트와 별도로, 기존 Chrome/Firefox 북마크를 한 번에 가져올 수 있습니다.
+
+기본 권장 방식은 바로 전부 요약하지 않고 먼저 가벼운 색인을 만드는 것입니다.
+
+```powershell
+bookmark-agent --config .\config.toml import-bookmarks --mode index
+```
+
+색인 모드는 다음 파일을 만듭니다.
+
+```text
+D:\obsidian\Bookmarks\_Index.md
+D:\obsidian\Bookmarks\_Inbox.md
+D:\obsidian\Bookmarks\by-domain\*.md
+```
+
+이 방식은 수천 개 북마크를 Obsidian 노트 수천 개로 바로 쪼개지 않습니다. 대신 도메인별 목록, 전체 인덱스, 처리 후보 목록을 만듭니다. 용량과 파일 수를 작게 유지하면서 전체 북마크 지도를 먼저 확보하는 목적입니다.
+
+필요한 북마크만 요약하려면 `summarize` 모드를 사용합니다.
+
+```powershell
+bookmark-agent --config .\config.toml import-bookmarks --mode summarize --type youtube --limit 50
+bookmark-agent --config .\config.toml import-bookmarks --mode summarize --domain github.com --limit 25
+bookmark-agent --config .\config.toml import-bookmarks --mode summarize --folder AI --limit 100
+```
+
+수천 개를 한꺼번에 요약하는 것도 가능하게 `--all` 옵션을 둘 수 있지만, 기본값은 제한을 요구합니다. 이유는 간단합니다. 로컬 요약은 돈은 안 들지만 시간이 들고, 일부 사이트는 본문 추출이나 자막 요청이 실패할 수 있기 때문입니다.
+
+### URL 정규화와 중복 제거
+
+같은 글이 여러 북마크 폴더에 들어 있거나, 추적 파라미터만 다른 URL로 저장되어 있을 수 있습니다.
+
+예를 들어 다음 URL은 같은 대상으로 취급됩니다.
+
+```text
+https://example.com/article?utm_source=newsletter#comments
+https://example.com/article
+```
+
+처리 과정에서는 다음 정리를 합니다.
+
+- 스킴과 호스트 소문자화
+- `utm_*`, `fbclid`, `gclid`, `msclkid` 같은 추적 파라미터 제거
+- URL fragment 제거
+- 쿼리 파라미터 정렬
+- canonical URL 기준 중복 제거
+
+최종 노트는 canonical URL 기준으로 하나만 만들고, 여러 브라우저 북마크가 같은 리소스를 가리킬 수 있습니다.
+
+### 웹페이지 요약 과정
+
+일반 웹페이지는 다음 순서로 처리됩니다.
+
+```text
+북마크 URL
+  -> canonical URL 생성
+  -> 이미 처리한 URL인지 확인
+  -> trafilatura로 HTML 다운로드 및 본문 추출
+  -> 제목, 저자, 게시일, 본문 일부 정리
+  -> Ollama에 요약 요청
+  -> 추천 폴더와 태그 산출
+  -> Obsidian Markdown 저장
+```
+
+본문 전체를 Obsidian에 저장하지 않습니다. 요약, 핵심 포인트, 추천 폴더, 추천 태그, 원본 링크만 남깁니다.
+
+### YouTube 요약 과정
+
+YouTube URL은 영상 파일을 받지 않고 `yt-dlp`로 메타데이터와 자막만 가져옵니다.
+
+```text
+YouTube URL
+  -> yt-dlp 메타데이터 조회
+  -> 제목, 채널, 길이, 설명 추출
+  -> 사용 가능한 자막 또는 자동 자막 조회
+  -> Ollama에 요약 요청
+  -> Obsidian Markdown 저장
+```
+
+자막을 가져올 수 없거나 YouTube 쪽에서 일시적으로 막으면, worker는 실패 상태를 기록하거나 제목/설명 기반 요약으로 후퇴합니다. 영상 자체는 저장하지 않습니다.
+
+### Ollama 로컬 요약
+
+기본 요약기는 Ollama입니다.
+
+```toml
+[summarizer]
+provider = "ollama"
+model = "qwen2.5:7b"
+endpoint = "http://localhost:11434/api/generate"
+```
+
+Ollama가 꺼져 있거나 모델이 없으면 작업은 실패로 기록되고 재시도 대상이 됩니다. 클라우드 API 사용량, 광고, 일일 제한이 기본 구조에 들어가지 않습니다.
+
+### 추천 폴더와 태그
+
+초기 기본값은 자동 이동이 아닙니다.
+
+노트 안에 다음처럼 추천만 남깁니다.
+
+```markdown
+## Recommendation
+
+- Suggested folder: AI/Agents
+- Suggested tags: bookmark, ai, browser
+```
+
+자동으로 브라우저 북마크 폴더를 옮기는 기능은 나중에 옵션으로 켤 수 있게 설계합니다. 처음부터 자동 이동을 켜면 기존 북마크 구조를 예상 밖으로 바꿀 수 있기 때문입니다.
+
+## 왜 SQLite를 쓰는가
+
+Obsidian은 최종 지식 저장소입니다. SQLite는 사용자가 읽는 DB가 아니라 내부 작업표입니다.
+
+SQLite가 필요한 이유는 다음 상태를 안정적으로 기억하기 위해서입니다.
+
+- 이 URL을 이미 처리했는가
+- 같은 canonical URL이 몇 번 들어왔는가
+- 처리 중 실패했는가
+- 몇 번 재시도했는가
+- 다음 재시도 시간은 언제인가
+- 어떤 Markdown 파일로 저장되었는가
+- 삭제된 북마크와 활성 북마크를 어떻게 구분할 것인가
+
+Markdown만으로도 목록은 만들 수 있지만, 실패 재시도와 중복 방지에는 비효율적입니다. 그래서 SQLite는 프로그램의 작업 큐이고, Obsidian Markdown은 사람이 읽는 최종 결과입니다.
+
+## 저장되는 Markdown 예시
+
+```markdown
+---
+source_url: "https://example.com/article"
+canonical_url: "https://example.com/article"
+resource_type: "webpage"
+processed_at: "2026-08-11T03:30:00Z"
+recommended_folder: "AI/Reading"
+tags:
+  - bookmark
+  - ai
+---
+
+# Example Article
+
+## Summary
+
+짧은 핵심 요약입니다.
+
+## Key Points
+
+- 중요한 포인트 1
+- 중요한 포인트 2
+- 중요한 포인트 3
+
+## Recommendation
+
+- Suggested folder: AI/Reading
+- Suggested tags: bookmark, ai
+
+## Source
+
+- Original: https://example.com/article
+```
+
+## 설치
+
+### 1. Python 환경 준비
+
+Windows PowerShell에서 프로젝트 폴더로 이동한 뒤 실행합니다.
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e .[build]
+```
+
+### 2. Ollama 준비
+
+Ollama를 실행하고 사용할 모델을 내려받습니다.
+
+```powershell
+ollama pull qwen2.5:7b
+```
+
+### 3. 설정 파일 생성
+
+Vault 경로는 예시처럼 D: 드라이브 경로를 지정할 수 있습니다.
+
+```powershell
+bookmark-agent --config .\config.toml init-config --vault-path D:\obsidian --force
+bookmark-agent --config .\config.toml init-db
+```
+
+`config.toml`은 개인 경로가 들어가는 파일이라 GitHub에는 올리지 않습니다. 공유용 기본값은 `config.example.toml`에 둡니다.
+
+### 4. 확장 프로그램 빌드
+
+```powershell
+python .\scripts\generate_chrome_manifest_key.py
+python .\scripts\build_extensions.py
+```
+
+빌드 결과는 `outputs/`에 생깁니다. 이 폴더는 로컬 설치용 산출물이므로 GitHub에 올리지 않습니다.
+
+### 5. Native Host 실행 파일 빌드
+
+```powershell
+pyinstaller --onefile --clean --name bookmark-agent-native --distpath outputs --workpath work\pyinstaller-build --specpath work\pyinstaller-spec scripts\native_host_launcher.py
+```
+
+### 6. Native Host 등록
+
+Chrome:
+
+```powershell
+bookmark-agent --config .\config.toml install-native-host --browser chrome --host-path .\outputs\bookmark-agent-native.exe --manifest-dir .\outputs --chrome-extension-id mgeldlpcgoloifmglhedpdiejgaejbda
+```
+
+Firefox:
+
+```powershell
+bookmark-agent --config .\config.toml install-native-host --browser firefox --host-path .\outputs\bookmark-agent-native.exe --manifest-dir .\outputs
+```
+
+### 7. 브라우저 확장 프로그램 설치
+
+설치 페이지를 열려면 다음 명령을 실행합니다.
+
+```powershell
+bookmark-agent --config .\config.toml open-extension-setup
+```
+
+Chrome:
+
+1. `chrome://extensions`를 엽니다.
+2. Developer Mode를 켭니다.
+3. `Load unpacked`를 누릅니다.
+4. `outputs\chrome-extension` 폴더를 선택합니다.
+5. 확장 프로그램 ID가 Native Host 등록 ID와 같은지 확인합니다.
+6. 확장 프로그램 팝업에서 `Test connection`을 누릅니다.
+
+Firefox:
+
+1. `about:debugging#/runtime/this-firefox`를 엽니다.
+2. `Load Temporary Add-on`을 누릅니다.
+3. `outputs\firefox-extension\manifest.json`을 선택합니다.
+4. 확장 프로그램 팝업에서 `Test connection`을 누릅니다.
+
+팝업에 `Native host: Connected`가 뜨면 브라우저와 로컬 에이전트 연결이 된 상태입니다.
+
+### 8. Worker 실행
+
+실시간으로 요약을 처리하려면 worker를 켜 둡니다.
+
+```powershell
+bookmark-agent --config .\config.toml worker
+```
+
+한 번만 처리하려면 다음처럼 실행합니다.
+
+```powershell
+bookmark-agent --config .\config.toml worker --once
+```
+
+Windows 로그인 시 worker를 자동 실행하려면 다음 명령을 사용합니다.
+
+```powershell
+bookmark-agent --config .\config.toml create-worker-shim --output .\outputs\bookmark-agent-worker.cmd
+bookmark-agent --config .\config.toml install-worker-startup --command-path .\outputs\bookmark-agent-worker.cmd
+```
+
+## 명령어 요약
+
+상태 점검:
+
+```powershell
+bookmark-agent --config .\config.toml doctor
+```
+
+진단 이벤트 넣기:
+
+```powershell
+bookmark-agent --config .\config.toml simulate-event --title "Diagnostic Bookmark" --url "https://example.com/?utm_source=test"
+```
+
+기존 북마크 미리보기:
+
+```powershell
+bookmark-agent --config .\config.toml import-bookmarks --mode index --dry-run
+```
+
+기존 북마크 색인 생성:
+
+```powershell
+bookmark-agent --config .\config.toml import-bookmarks --mode index
+```
+
+기존 북마크 일부 요약:
+
+```powershell
+bookmark-agent --config .\config.toml import-bookmarks --mode summarize --type youtube --limit 50
+bookmark-agent --config .\config.toml import-bookmarks --mode summarize --domain github.com --limit 25
+bookmark-agent --config .\config.toml import-bookmarks --mode summarize --folder AI --limit 100
+```
+
+Worker 실행:
+
+```powershell
+bookmark-agent --config .\config.toml worker
+```
+
+## 프로젝트 폴더 구조
+
+```text
+.
+  README.md
+  SPEC.md
+  pyproject.toml
+  config.example.toml
+  extension/
+    background.js
+    popup.html
+    popup.css
+    popup.js
+    manifest.chrome.json
+    manifest.firefox.json
+  native-host/
+    chrome-host.example.json
+    firefox-host.example.json
+  scripts/
+    build_extensions.py
+    generate_chrome_manifest_key.py
+    native_host_launcher.py
+  src/bookmark_agent/
+    cli.py
+    config.py
+    database.py
+    canonical.py
+    native_host.py
+    worker.py
+    extraction.py
+    summarizer.py
+    markdown.py
+    bookmark_import.py
+```
+
+## 보안과 개인정보
+
+- 확장 프로그램 권한은 `bookmarks`와 `nativeMessaging` 중심입니다.
+- 확장 프로그램은 파일 시스템에 직접 접근하지 않습니다.
+- 로컬 에이전트는 설정된 Vault 경로 아래에만 상태와 Markdown을 씁니다.
+- Ollama 호출은 `localhost` 기준입니다.
+- YouTube 영상 파일은 저장하지 않습니다.
+- 전체 웹페이지 아카이브를 저장하지 않습니다.
+- `config.toml`, `outputs/`, `work/`, SQLite DB, 실행 파일은 GitHub에 올리지 않습니다.
+
+## 문제 해결
+
+### 팝업에서 Connected가 뜨지 않을 때
+
+1. Native Host가 등록되어 있는지 확인합니다.
+2. Chrome 확장 프로그램 ID와 Native Host manifest의 `allowed_origins`가 같은지 확인합니다.
+3. Firefox는 임시 설치 확장 프로그램 ID와 manifest의 `allowed_extensions`가 맞는지 확인합니다.
+4. `bookmark-agent --config .\config.toml doctor`를 실행합니다.
+
+### 노트가 생성되지 않을 때
+
+1. Worker가 실행 중인지 확인합니다.
+2. Ollama가 켜져 있는지 확인합니다.
+3. `ollama list`에서 설정된 모델이 있는지 확인합니다.
+4. `.bookmark-agent`의 SQLite 큐에 실패 상태가 쌓였는지 확인합니다.
+
+### YouTube 자막이 비어 있을 때
+
+일부 영상은 자막이 없거나 자동 자막 접근이 제한될 수 있습니다. 이 경우 worker는 가능한 메타데이터와 설명을 사용하거나 실패 재시도 상태를 남깁니다.
+
+## 현재 검증된 동작
+
+- Chrome 확장 프로그램 팝업의 Native Host 연결 확인
+- 실제 Chrome 북마크 생성 이벤트 수신
+- YouTube 북마크 메타데이터 처리
+- Ollama 로컬 요약
+- `D:\obsidian\Bookmarks`에 Markdown 노트 생성
+- 기존 북마크 대량 색인 생성
+- 진단 명령 `doctor` 통과
+
+## 라이선스
+
+초기 프로젝트 골격입니다. 필요하면 이후에 라이선스 파일을 추가하세요.

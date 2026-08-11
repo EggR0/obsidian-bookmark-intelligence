@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="popup.css">
+    <title>Obsidian Bookmark Intelligence</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Obsidian Bookmark Intelligence</h1>
+        <span id="status-dot" aria-hidden="true"></span>
+      </header>
+
+      <dl>
+        <div>
+          <dt>Native host</dt>
+          <dd id="host-status">Checking...</dd>
+        </div>
+        <div>
+          <dt>Vault</dt>
+          <dd id="vault-path">Unknown</dd>
+        </div>
+        <div>
+          <dt>Last check</dt>
+          <dd id="last-check">-</dd>
+        </div>
+      </dl>
+
+      <button id="test-button" type="button">Test connection</button>
+      <p id="detail"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

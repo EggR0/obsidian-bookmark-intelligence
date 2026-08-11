@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+config.toml
+*.sqlite3
+*.log
+extension/manifest.json
+outputs/
+work/
+dist/
+build/
+*.spec
+src/*.egg-info/
