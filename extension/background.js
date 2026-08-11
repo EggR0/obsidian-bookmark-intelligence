@@ -16,6 +16,45 @@ function detectBrowser() {
   return "unknown";
 }
 
+function randomId() {
+  if (globalThis.crypto && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `profile-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getStorage(keys) {
+  if (!storageArea) return Promise.resolve({});
+  if (isPromiseApi) {
+    return storageArea.get(keys);
+  }
+
+  return new Promise((resolve) => {
+    storageArea.get(keys, resolve);
+  });
+}
+
+function setStorage(values) {
+  if (!storageArea) return Promise.resolve();
+  if (isPromiseApi) {
+    return storageArea.set(values);
+  }
+
+  return new Promise((resolve) => {
+    storageArea.set(values, resolve);
+  });
+}
+
+async function getProfileId() {
+  const data = await getStorage(["profileId"]);
+  if (data && data.profileId) {
+    return data.profileId;
+  }
+  const profileId = randomId();
+  await setStorage({ profileId });
+  return profileId;
+}
+
 function compactBookmark(node) {
   if (!node) return {};
   return {
@@ -33,7 +72,8 @@ function eventEnvelope(type, bookmark, change = {}) {
     schema_version: 1,
     source: {
       browser: detectBrowser(),
-      extension: EXTENSION_NAME
+      extension: EXTENSION_NAME,
+      profile_id: null
     },
     event: {
       type,
@@ -72,7 +112,8 @@ function sendNativeRequest(message) {
 
 function sendNativeMessage(message) {
   try {
-    sendNativeRequest(message)
+    withProfileId(message)
+      .then(sendNativeRequest)
       .then((response) => {
         setLastStatus({
           ok: Boolean(response && response.ok),
@@ -96,6 +137,17 @@ function sendNativeMessage(message) {
       error: String(error && error.message ? error.message : error)
     });
   }
+}
+
+async function withProfileId(message) {
+  const profileId = await getProfileId();
+  return {
+    ...message,
+    source: {
+      ...(message.source || {}),
+      profile_id: profileId
+    }
+  };
 }
 
 function getBookmark(id) {
@@ -142,7 +194,7 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  sendNativeRequest({
+  withProfileId({
     schema_version: 1,
     command: "ping",
     source: {
@@ -154,6 +206,49 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
       timestamp: nowIso()
     }
   })
+    .then(sendNativeRequest)
+    .then((response) => {
+      const status = {
+        ok: Boolean(response && response.ok),
+        checkedAt: nowIso(),
+        response: response || null
+      };
+      setLastStatus(status);
+      sendResponse(status);
+    })
+    .catch((error) => {
+      const status = {
+        ok: false,
+        checkedAt: nowIso(),
+        error: String(error && error.message ? error.message : error)
+      };
+      setLastStatus(status);
+      sendResponse(status);
+    });
+
+  return true;
+});
+
+api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "import-bookmarks-index") {
+    return false;
+  }
+
+  withProfileId({
+    schema_version: 1,
+    command: "import-bookmarks",
+    mode: "index",
+    dry_run: Boolean(message.dryRun),
+    source: {
+      browser: detectBrowser(),
+      extension: EXTENSION_NAME
+    },
+    event: {
+      type: "import-bookmarks",
+      timestamp: nowIso()
+    }
+  })
+    .then(sendNativeRequest)
     .then((response) => {
       const status = {
         ok: Boolean(response && response.ok),

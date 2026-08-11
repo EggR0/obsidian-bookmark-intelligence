@@ -5,6 +5,7 @@ import os
 import struct
 import sys
 
+from .bookmark_import import ImportFilters, import_bookmarks
 from .config import AppConfig
 from .service import ingest_bookmark_event
 
@@ -37,7 +38,25 @@ def _send_message(message: dict) -> None:
 
 
 def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
-    if message.get("command") != "ping":
+    command = message.get("command")
+    if command == "import-bookmarks":
+        mode = message.get("mode") or "index"
+        if mode != "index":
+            return {"ok": False, "error": "Native import currently supports index mode only."}
+        filters = ImportFilters(
+            browser=message.get("browser"),
+            profile=message.get("profile"),
+            folder=message.get("folder"),
+            domain=message.get("domain"),
+            url_contains=message.get("url_contains"),
+            resource_type=message.get("resource_type"),
+            limit=message.get("limit"),
+        )
+        result = import_bookmarks(config, mode, filters, dry_run=bool(message.get("dry_run")))
+        result["command"] = command
+        return result
+
+    if command != "ping":
         return None
     return {
         "ok": True,

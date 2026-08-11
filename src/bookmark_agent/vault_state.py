@@ -20,6 +20,7 @@ def append_event_log(config: AppConfig, payload: dict, ingest_result: dict) -> N
         "bookmark": payload.get("bookmark", {}),
         "canonical_url": ingest_result.get("canonical_url"),
         "resource_id": ingest_result.get("resource_id"),
+        "profile_id": ingest_result.get("profile_id") or (payload.get("source") or {}).get("profile_id"),
     }
     path = state_dir(config) / "events.jsonl"
     with path.open("a", encoding="utf-8") as file:

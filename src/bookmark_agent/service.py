@@ -14,6 +14,7 @@ def ingest_bookmark_event(config: AppConfig, payload: dict) -> dict:
     bookmark = payload.get("bookmark") or {}
 
     browser = source.get("browser") or "unknown"
+    profile_id = source.get("profile_id") or source.get("profile") or "default"
     event_type = event.get("type") or "unknown"
     bookmark_id = bookmark.get("id")
     title = bookmark.get("title") or ""
@@ -28,18 +29,27 @@ def ingest_bookmark_event(config: AppConfig, payload: dict) -> dict:
     with transaction(config.database.path) as connection:
         connection.execute(
             """
-            INSERT INTO bookmark_events (received_at, browser, event_type, bookmark_id, payload_json)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO bookmark_events (received_at, browser, profile_id, event_type, bookmark_id, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (received_at, browser, event_type, bookmark_id, json.dumps(payload, ensure_ascii=False, separators=(",", ":"))),
+            (
+                received_at,
+                browser,
+                profile_id,
+                event_type,
+                bookmark_id,
+                json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+            ),
         )
 
         if bookmark_id:
             connection.execute(
                 """
-                INSERT INTO bookmarks (browser, bookmark_id, url, canonical_url, title, parent_id, status, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(browser, bookmark_id) DO UPDATE SET
+                INSERT INTO bookmarks (
+                  browser, profile_id, bookmark_id, url, canonical_url, title, parent_id, status, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(browser, profile_id, bookmark_id) DO UPDATE SET
                   url = excluded.url,
                   canonical_url = excluded.canonical_url,
                   title = excluded.title,
@@ -47,7 +57,7 @@ def ingest_bookmark_event(config: AppConfig, payload: dict) -> dict:
                   status = excluded.status,
                   updated_at = excluded.updated_at
                 """,
-                (browser, bookmark_id, url, canonical_url, title, parent_id, status, received_at),
+                (browser, profile_id, bookmark_id, url, canonical_url, title, parent_id, status, received_at),
             )
 
         if url and event_type != "removed" and canonical_url:
@@ -75,6 +85,8 @@ def ingest_bookmark_event(config: AppConfig, payload: dict) -> dict:
     result = {
         "ok": True,
         "event_type": event_type,
+        "browser": browser,
+        "profile_id": profile_id,
         "bookmark_id": bookmark_id,
         "canonical_url": canonical_url,
         "resource_id": resource_id,

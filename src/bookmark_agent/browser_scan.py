@@ -160,6 +160,7 @@ def _event_for(bookmark: ScannedBookmark, event_type: str) -> dict:
             "browser": bookmark.browser,
             "extension": "profile-scanner",
             "profile": bookmark.profile,
+            "profile_id": bookmark.profile,
         },
         "event": {"type": event_type},
         "bookmark": {

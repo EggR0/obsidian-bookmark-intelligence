@@ -66,6 +66,11 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.actions {
+  display: grid;
+  gap: 8px;
+}
+
 button {
   width: 100%;
   min-height: 34px;
@@ -76,6 +81,12 @@ button {
   font: inherit;
   font-weight: 650;
   cursor: pointer;
+}
+
+button.secondary {
+  border-color: #b9c3d1;
+  background: #ffffff;
+  color: #263241;
 }
 
 button:disabled {

@@ -7,6 +7,8 @@ const vaultPath = document.getElementById("vault-path");
 const lastCheck = document.getElementById("last-check");
 const detail = document.getElementById("detail");
 const testButton = document.getElementById("test-button");
+const previewIndexButton = document.getElementById("preview-index-button");
+const indexButton = document.getElementById("index-button");
 
 function sendMessage(message) {
   if (isPromiseApi) {
@@ -51,9 +53,21 @@ function render(status) {
 
   const response = status.response || {};
   vaultPath.textContent = response.vault_path || "Unknown";
-  detail.textContent = status.ok
-    ? `Queue: ${response.database_path || "unknown"}`
-    : status.error || response.error || "Connection failed";
+  if (!status.ok) {
+    detail.textContent = status.error || response.error || "Connection failed";
+    return;
+  }
+
+  if (response.command === "import-bookmarks") {
+    const selected = Number.isInteger(response.selected) ? response.selected : 0;
+    const domains = Number.isInteger(response.domain_count) ? response.domain_count : 0;
+    detail.textContent = response.dry_run
+      ? `Preview: ${selected} bookmarks across ${domains} domains.`
+      : `Index written: ${selected} bookmarks across ${domains} domains.`;
+    return;
+  }
+
+  detail.textContent = `Queue: ${response.database_path || "unknown"}`;
 }
 
 async function testConnection() {
@@ -75,6 +89,27 @@ async function testConnection() {
 }
 
 testButton.addEventListener("click", testConnection);
+
+async function runImportIndex(dryRun) {
+  const button = dryRun ? previewIndexButton : indexButton;
+  button.disabled = true;
+  detail.textContent = dryRun ? "Scanning existing bookmarks..." : "Creating Obsidian index...";
+  try {
+    const status = await sendMessage({ type: "import-bookmarks-index", dryRun });
+    render(status);
+  } catch (error) {
+    render({
+      ok: false,
+      checkedAt: new Date().toISOString(),
+      error: String(error && error.message ? error.message : error)
+    });
+  } finally {
+    button.disabled = false;
+  }
+}
+
+previewIndexButton.addEventListener("click", () => runImportIndex(true));
+indexButton.addEventListener("click", () => runImportIndex(false));
 
 getStorage(["lastStatus"])
   .then((data) => render(data.lastStatus))
