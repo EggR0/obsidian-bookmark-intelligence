@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sys
 
+from .activity import record_activity
 from .bookmark_import import ImportFilters, import_bookmarks
 from .browser_scan import scan_browser_bookmarks
 from .config import load_config
@@ -56,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     simulate.add_argument("--browser", default="diagnostic")
 
     subparsers.add_parser("doctor", help="Check local setup")
+    subparsers.add_parser("test-notification", help="Write one activity entry and show a desktop notification")
     subparsers.add_parser("open-extension-setup", help="Open browser extension pages and outputs folder")
     scan = subparsers.add_parser("scan-bookmarks", help="Scan local Chrome/Firefox bookmark stores once")
     scan.add_argument("--dry-run", action="store_true", help="Count changes without enqueueing events")
@@ -218,6 +220,18 @@ def main(argv: list[str] | None = None) -> int:
             if not result.ok:
                 failed += 1
         print(f"Doctor finished with {failed} warning(s).")
+        return 0
+
+    if args.command == "test-notification":
+        record_activity(
+            config,
+            "notification_test",
+            "Bookmark Agent notification test",
+            f"Notifications are enabled. Ollama model: {config.ollama.model}.",
+            details={"ollama_model": config.ollama.model},
+            notify=True,
+        )
+        print("Wrote activity entry and requested desktop notification.")
         return 0
 
     if args.command == "open-extension-setup":

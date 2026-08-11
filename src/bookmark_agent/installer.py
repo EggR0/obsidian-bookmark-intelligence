@@ -91,6 +91,16 @@ enabled = false
 enabled = false
 interval_seconds = 60
 
+[notifications]
+enabled = true
+desktop = true
+activity_log = true
+activity_note = true
+print_to_console = true
+notify_on_start = false
+notify_on_success = true
+notify_on_failure = true
+
 [recommendations]
 default_folder = "Inbox/Bookmarks"
 default_tags = ["bookmark"]

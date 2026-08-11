@@ -14,6 +14,7 @@ Chrome과 Firefox 북마크를 로컬에서 감지하고, 중복을 정리한 �
 - 요약은 기본적으로 로컬 Ollama 모델을 사용합니다.
 - Obsidian에는 읽기 좋은 핵심 Markdown만 저장합니다.
 - SQLite는 Obsidian을 대체하는 DB가 아니라, 중복 방지와 재시도를 위한 내부 작업 큐로만 사용합니다.
+- 처리 과정과 완료 결과를 Obsidian 활동 노트, JSONL 로그, Windows 알림으로 보여줍니다.
 
 ## 현재 기본 구성
 
@@ -38,9 +39,10 @@ D:\obsidian
   .bookmark-agent\
     bookmark-agent.sqlite3
     events.jsonl
+    activity.jsonl
 ```
 
-`Bookmarks` 폴더는 사용자가 Obsidian에서 읽고 관리하는 최종 결과입니다. `.bookmark-agent` 폴더는 프로그램이 실패 재시도, 중복 제거, 처리 상태를 기억하기 위한 내부 상태입니다.
+`Bookmarks` 폴더는 사용자가 Obsidian에서 읽고 관리하는 최종 결과입니다. `Bookmarks\_Activity.md`에는 처리 단계가 누적됩니다. `.bookmark-agent` 폴더는 프로그램이 실패 재시도, 중복 제거, 처리 상태를 기억하기 위한 내부 상태입니다.
 
 ## 전체 작동 방식
 
@@ -185,6 +187,60 @@ endpoint = "http://localhost:11434/api/generate"
 ```
 
 Ollama가 꺼져 있거나 모델이 없으면 작업은 실패로 기록되고 재시도 대상이 됩니다. 클라우드 API 사용량, 광고, 일일 제한이 기본 구조에 들어가지 않습니다.
+
+### 작업 진행 알림
+
+worker는 처리 과정을 다음 위치에 기록합니다.
+
+```text
+D:\obsidian\Bookmarks\_Activity.md
+D:\obsidian\.bookmark-agent\activity.jsonl
+```
+
+기록되는 단계는 다음과 같습니다.
+
+```text
+worker_started
+batch_started
+processing_started
+extraction_started
+extraction_completed
+ollama_started
+ollama_completed
+processing_succeeded
+processing_failed
+```
+
+특히 `ollama_started`와 `ollama_completed`에는 사용한 Ollama 모델명이 들어갑니다.
+
+예시:
+
+```markdown
+## 2026-08-11T04:20:00Z - ollama_started
+
+- Title: Ollama summary started
+- Message: Calling local Ollama model qwen2.5:7b.
+- URL: https://example.com/article
+- Ollama model: qwen2.5:7b
+```
+
+Windows에서는 성공/실패 시 데스크톱 알림도 표시합니다. 시작 알림은 기본적으로 꺼져 있습니다. 북마크를 대량 처리할 때 너무 많은 알림이 뜨는 것을 피하기 위해서입니다.
+
+알림 설정은 `config.toml`에서 조정합니다.
+
+```toml
+[notifications]
+enabled = true
+desktop = true
+activity_log = true
+activity_note = true
+print_to_console = true
+notify_on_start = false
+notify_on_success = true
+notify_on_failure = true
+```
+
+모든 과정을 Obsidian에서 보고 싶으면 `activity_note = true`를 유지하면 됩니다. Windows 알림이 불편하면 `desktop = false`로 끄면 됩니다.
 
 ### 추천 폴더와 태그
 
@@ -369,6 +425,12 @@ bookmark-agent --config .\config.toml install-worker-startup --command-path .\ou
 bookmark-agent --config .\config.toml doctor
 ```
 
+알림과 활동 노트 테스트:
+
+```powershell
+bookmark-agent --config .\config.toml test-notification
+```
+
 진단 이벤트 넣기:
 
 ```powershell
@@ -424,6 +486,7 @@ bookmark-agent --config .\config.toml worker
     generate_chrome_manifest_key.py
     native_host_launcher.py
   src/bookmark_agent/
+    activity.py
     cli.py
     config.py
     database.py
@@ -444,6 +507,7 @@ bookmark-agent --config .\config.toml worker
 - Ollama 호출은 `localhost` 기준입니다.
 - YouTube 영상 파일은 저장하지 않습니다.
 - 전체 웹페이지 아카이브를 저장하지 않습니다.
+- Windows 알림은 로컬 데스크톱 알림만 사용합니다.
 - `config.toml`, `outputs/`, `work/`, SQLite DB, 실행 파일은 GitHub에 올리지 않습니다.
 
 ## 문제 해결

@@ -49,6 +49,18 @@ class BrowserScanConfig:
 
 
 @dataclass(frozen=True)
+class NotificationsConfig:
+    enabled: bool
+    desktop: bool
+    activity_log: bool
+    activity_note: bool
+    print_to_console: bool
+    notify_on_start: bool
+    notify_on_success: bool
+    notify_on_failure: bool
+
+
+@dataclass(frozen=True)
 class AppConfig:
     database: DatabaseConfig
     obsidian: ObsidianConfig
@@ -57,6 +69,7 @@ class AppConfig:
     auto_move: AutoMoveConfig
     recommendations: RecommendationConfig
     browser_scan: BrowserScanConfig
+    notifications: NotificationsConfig
 
 
 def load_config(path: Path) -> AppConfig:
@@ -102,5 +115,15 @@ def load_config(path: Path) -> AppConfig:
         browser_scan=BrowserScanConfig(
             enabled=bool(raw.get("browser_scan", {}).get("enabled", True)),
             interval_seconds=int(raw.get("browser_scan", {}).get("interval_seconds", 60)),
+        ),
+        notifications=NotificationsConfig(
+            enabled=bool(raw.get("notifications", {}).get("enabled", True)),
+            desktop=bool(raw.get("notifications", {}).get("desktop", True)),
+            activity_log=bool(raw.get("notifications", {}).get("activity_log", True)),
+            activity_note=bool(raw.get("notifications", {}).get("activity_note", True)),
+            print_to_console=bool(raw.get("notifications", {}).get("print_to_console", True)),
+            notify_on_start=bool(raw.get("notifications", {}).get("notify_on_start", False)),
+            notify_on_success=bool(raw.get("notifications", {}).get("notify_on_success", True)),
+            notify_on_failure=bool(raw.get("notifications", {}).get("notify_on_failure", True)),
         ),
     )

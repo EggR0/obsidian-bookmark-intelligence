@@ -8,6 +8,7 @@ import os
 import time
 
 from .browser_scan import scan_browser_bookmarks
+from .activity import record_activity
 from .config import AppConfig
 from .database import transaction, utc_now
 from .extraction import extract_resource
@@ -84,9 +85,59 @@ def fetch_due_resources(config: AppConfig) -> list[dict]:
 
 
 def process_resource(config: AppConfig, resource: dict) -> None:
+    record_activity(
+        config,
+        "processing_started",
+        "Bookmark processing started",
+        f"Starting {resource['resource_type']} extraction.",
+        resource=resource,
+        details={"ollama_model": config.ollama.model},
+        notify=config.notifications.notify_on_start,
+    )
+
+    record_activity(
+        config,
+        "extraction_started",
+        "Extracting bookmark content",
+        f"Using {'yt-dlp' if resource['resource_type'] == 'youtube' else 'trafilatura'} for source extraction.",
+        resource=resource,
+        details={"ollama_model": config.ollama.model},
+    )
     extracted = extract_resource(resource["url"], resource["resource_type"])
     content_hash = hashlib.sha256(extracted.text.encode("utf-8")).hexdigest()
+
+    record_activity(
+        config,
+        "extraction_completed",
+        extracted.title or resource["title"] or "Extraction completed",
+        f"Extracted {len(extracted.text)} characters; metadata keys: {', '.join(sorted(extracted.metadata.keys()))}.",
+        resource=resource,
+        details={
+            "ollama_model": config.ollama.model,
+            "extracted_title": extracted.title,
+            "extracted_text_chars": len(extracted.text),
+        },
+    )
+
+    record_activity(
+        config,
+        "ollama_started",
+        "Ollama summary started",
+        f"Calling local Ollama model {config.ollama.model}.",
+        resource=resource,
+        details={"ollama_model": config.ollama.model},
+    )
     summary = summarize_with_ollama(config, extracted.title, resource["url"], extracted.text)
+
+    record_activity(
+        config,
+        "ollama_completed",
+        "Ollama summary completed",
+        f"Model {config.ollama.model} returned {len(summary)} characters.",
+        resource=resource,
+        details={"ollama_model": config.ollama.model, "summary_chars": len(summary)},
+    )
+
     recommended_folder, recommended_tags = derive_recommendations(config, summary)
     markdown_path = write_obsidian_note(
         config,
@@ -137,6 +188,21 @@ def process_resource(config: AppConfig, resource: dict) -> None:
             ),
         )
 
+    record_activity(
+        config,
+        "processing_succeeded",
+        extracted.title or resource["title"] or "Bookmark processed",
+        f"Saved Obsidian note with model {config.ollama.model}.",
+        resource=resource,
+        details={
+            "ollama_model": config.ollama.model,
+            "markdown_path": str(markdown_path),
+            "recommended_folder": recommended_folder,
+            "recommended_tags": recommended_tags,
+        },
+        notify=config.notifications.notify_on_success,
+    )
+
 
 def mark_failed(config: AppConfig, resource: dict, error: Exception) -> None:
     retry_count = int(resource["retry_count"]) + 1
@@ -160,10 +226,26 @@ def mark_failed(config: AppConfig, resource: dict, error: Exception) -> None:
                 resource["id"],
             ),
         )
+    record_activity(
+        config,
+        "processing_failed",
+        resource.get("title") or "Bookmark processing failed",
+        f"Attempt {retry_count}/{config.processing.max_retries} failed. Next retry: {next_retry.replace(microsecond=0).isoformat().replace('+00:00', 'Z')}.",
+        resource=resource,
+        details={"ollama_model": config.ollama.model, "error": str(error)[:1000], "retry_count": retry_count},
+        notify=config.notifications.notify_on_failure,
+    )
 
 
 def run_worker(config: AppConfig, once: bool = False, sleep_seconds: int = 10) -> None:
     with worker_lock(config):
+        record_activity(
+            config,
+            "worker_started",
+            "Bookmark worker started",
+            f"Worker is running with Ollama model {config.ollama.model}.",
+            details={"ollama_model": config.ollama.model, "once": once},
+        )
         last_scan_at = 0.0
         while True:
             now_monotonic = time.monotonic()
@@ -177,6 +259,14 @@ def run_worker(config: AppConfig, once: bool = False, sleep_seconds: int = 10) -
                 last_scan_at = now_monotonic
 
             resources = fetch_due_resources(config)
+            if resources:
+                record_activity(
+                    config,
+                    "batch_started",
+                    "Bookmark batch started",
+                    f"Processing {len(resources)} queued resource(s).",
+                    details={"ollama_model": config.ollama.model, "resource_count": len(resources)},
+                )
             for resource in resources:
                 try:
                     process_resource(config, resource)
