@@ -118,7 +118,7 @@ def load_config(path: Path) -> AppConfig:
         ),
         notifications=NotificationsConfig(
             enabled=bool(raw.get("notifications", {}).get("enabled", True)),
-            desktop=bool(raw.get("notifications", {}).get("desktop", True)),
+            desktop=bool(raw.get("notifications", {}).get("desktop", False)),
             activity_log=bool(raw.get("notifications", {}).get("activity_log", True)),
             activity_note=bool(raw.get("notifications", {}).get("activity_note", True)),
             print_to_console=bool(raw.get("notifications", {}).get("print_to_console", True)),

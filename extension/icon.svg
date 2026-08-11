@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Obsidian Bookmark Intelligence">
+  <rect width="128" height="128" rx="24" fill="#243142"/>
+  <path d="M34 28h60a8 8 0 0 1 8 8v66l-18-12-18 12V36a8 8 0 0 0-8-8H34Z" fill="#6fa4ff"/>
+  <path d="M30 28h34a8 8 0 0 1 8 8v66L54 90l-18 12V36a8 8 0 0 0-8-8h2Z" fill="#ffffff"/>
+  <circle cx="88" cy="38" r="10" fill="#21b97b"/>
+</svg>

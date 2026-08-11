@@ -18,7 +18,19 @@ def copy_extension(target: Path, manifest_name: str) -> None:
         shutil.rmtree(target)
     target.mkdir(parents=True)
 
-    for filename in ["background.js", "popup.html", "popup.css", "popup.js"]:
+    for filename in [
+        "background.js",
+        "popup.html",
+        "popup.css",
+        "popup.js",
+        "options.html",
+        "options.css",
+        "options.js",
+        "icon.svg",
+        "icon16.png",
+        "icon48.png",
+        "icon128.png",
+    ]:
         shutil.copy2(EXTENSION_SRC / filename, target / filename)
     shutil.copy2(EXTENSION_SRC / manifest_name, target / "manifest.json")
 

@@ -61,12 +61,14 @@ Obsidian vault
   - `bookmarks.onMoved`
   - `bookmarks.onRemoved`
 - Sends small event payloads to the local native host.
-- Provides popup controls for Native Host connection testing and existing bookmark index creation.
+- Provides popup controls for Native Host connection testing, local agent download, and existing bookmark index creation.
+- Provides an options page for browser notification settings and activity polling interval.
 - Does not crawl webpages, call LLMs, or write files.
 
 ### Native Host
 
 - Receives browser events over Native Messaging.
+- Handles control commands: `ping`, `import-bookmarks`, and `recent-activity`.
 - Canonicalizes URLs.
 - Appends a human-inspectable event log to `D:\obsidian\.bookmark-agent\events.jsonl`.
 - Adds or updates queue state in `D:\obsidian\.bookmark-agent\bookmark-agent.sqlite3`.
@@ -261,9 +263,19 @@ canonical_url
 
 This keeps browser profile state separate while still deduplicating the same URL into one Obsidian summary note.
 
+## Browser Notification Model
+
+The worker does not show Windows notifications by default. Instead:
+
+1. The worker writes progress to `D:\obsidian\.bookmark-agent\activity.jsonl`.
+2. The extension uses the `alarms` permission to poll `recent-activity` through Native Messaging.
+3. The extension uses the `notifications` permission to show browser notifications for queued, succeeded, and failed processing.
+
+This keeps user-visible notifications inside Chrome/Firefox while preserving Obsidian `_Activity.md` as the durable activity log.
+
 ## Security Model
 
-- The extension only requests `bookmarks`, `nativeMessaging`, and `storage`.
+- The extension only requests `bookmarks`, `nativeMessaging`, `storage`, `notifications`, and `alarms`.
 - The extension has no filesystem access.
 - The local agent writes only under the configured vault path for notes/state.
 - Native Messaging registration is explicit in HKCU registry keys.

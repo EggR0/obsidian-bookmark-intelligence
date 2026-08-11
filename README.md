@@ -14,7 +14,7 @@ Chrome과 Firefox 북마크를 로컬에서 감지하고, 중복을 정리한 �
 - 요약은 기본적으로 로컬 Ollama 모델을 사용합니다.
 - Obsidian에는 읽기 좋은 핵심 Markdown만 저장합니다.
 - SQLite는 Obsidian을 대체하는 DB가 아니라, 중복 방지와 재시도를 위한 내부 작업 큐로만 사용합니다.
-- 처리 과정과 완료 결과를 Obsidian 활동 노트, JSONL 로그, Windows 알림으로 보여줍니다.
+- 처리 과정과 완료 결과를 Obsidian 활동 노트, JSONL 로그, 브라우저 확장 알림으로 보여줍니다.
 
 ## 현재 기본 구성
 
@@ -96,8 +96,29 @@ extension/
 - `Test connection`: Native Host와 Vault 연결 상태 확인
 - `Preview existing bookmarks`: 기존 Chrome/Firefox 북마크 수량과 도메인 수 미리보기
 - `Create Obsidian index`: PowerShell 없이 기존 북마크 색인을 Obsidian에 생성
+- `Get local agent`: GitHub Releases에서 로컬 agent/server 설치 파일 받기
+- `Settings`: 확장 프로그램 설정 페이지 열기
 
 여러 Chrome/Firefox 프로필을 사용하는 경우, 확장 프로그램 설치마다 `profile_id`를 로컬 storage에 생성해서 이벤트에 포함합니다. 따라서 같은 Windows 계정 안에서 Chrome 프로필을 여러 개 쓰더라도 `browser + profile_id + bookmark_id` 기준으로 북마크 항목이 분리됩니다.
+
+### 스토어 설치와 로컬 agent 다운로드
+
+Chrome Web Store와 Firefox Add-ons에서 검색 설치가 되려면 각 스토어 개발자 계정으로 패키지를 업로드하고 심사를 통과해야 합니다. 이 저장소는 제출 가능한 패키지를 생성합니다.
+
+```powershell
+python .\scripts\build_extensions.py
+```
+
+생성되는 제출 패키지:
+
+```text
+outputs\chrome-extension.zip
+outputs\firefox-extension.xpi
+```
+
+확장 프로그램 자체는 스토어에서 설치할 수 있게 만들 수 있지만, 로컬 agent/server는 브라우저 스토어가 자동 설치해주지 않습니다. 그래서 확장 프로그램의 `Get local agent` 버튼은 GitHub Releases 페이지를 열어 사용자가 로컬 agent를 받을 수 있게 합니다.
+
+스토어 제출 체크리스트와 listing 문안은 `STORE_SUBMISSION.md`에 정리되어 있습니다.
 
 ### 기존 북마크 수천 개 가져오기
 
@@ -406,14 +427,14 @@ Ollama 호출에 실패하면 `processing_failed`에 실패 이유가 남습니�
 - Ollama model: qwen2.5:7b
 ```
 
-Windows에서는 성공/실패 시 데스크톱 알림도 표시합니다. 시작 알림은 기본적으로 꺼져 있습니다. 북마크를 대량 처리할 때 너무 많은 알림이 뜨는 것을 피하기 위해서입니다.
+현재 기본값은 Windows 데스크톱 알림 대신 브라우저 확장 프로그램 알림을 사용하는 것입니다. worker는 `_Activity.md`와 `activity.jsonl`에 상태를 남기고, 확장 프로그램이 `recent-activity` 명령으로 이를 읽어 브라우저 알림을 띄웁니다.
 
-알림 설정은 `config.toml`에서 조정합니다.
+agent 쪽 활동 기록 설정은 `config.toml`에서 조정합니다.
 
 ```toml
 [notifications]
 enabled = true
-desktop = true
+desktop = false
 activity_log = true
 activity_note = true
 print_to_console = true
@@ -422,7 +443,23 @@ notify_on_success = true
 notify_on_failure = true
 ```
 
-모든 과정을 Obsidian에서 보고 싶으면 `activity_note = true`를 유지하면 됩니다. Windows 알림이 불편하면 `desktop = false`로 끄면 됩니다.
+모든 과정을 Obsidian에서 보고 싶으면 `activity_note = true`를 유지하면 됩니다. 기본 설정 파일에서는 `desktop = false`입니다.
+
+브라우저 확장 알림은 확장 프로그램 설정 페이지에서 조정합니다.
+
+### 확장 프로그램 설정 페이지
+
+확장 프로그램의 `Settings` 버튼 또는 브라우저 확장 관리 화면의 옵션 페이지에서 다음 설정을 변경할 수 있습니다.
+
+- Local agent download URL
+- 브라우저 알림 사용 여부
+- 큐 등록 알림 사용 여부
+- Obsidian 요약 저장 완료 알림 사용 여부
+- 처리 실패 알림 사용 여부
+- worker 활동 로그 polling 사용 여부
+- polling 주기
+
+이 설정은 브라우저 확장 storage에 저장됩니다. Obsidian Vault 경로, Ollama 모델, SQLite 경로 같은 agent 설정은 여전히 `config.toml`에서 관리합니다.
 
 ### 추천 폴더와 태그
 
@@ -707,6 +744,7 @@ bookmark-agent --config .\config.toml worker
 .
   README.md
   SPEC.md
+  STORE_SUBMISSION.md
   install.ps1
   install.sh
   pyproject.toml
@@ -716,6 +754,10 @@ bookmark-agent --config .\config.toml worker
     popup.html
     popup.css
     popup.js
+    options.html
+    options.css
+    options.js
+    icon128.png
     manifest.chrome.json
     manifest.firefox.json
   native-host/
@@ -741,14 +783,15 @@ bookmark-agent --config .\config.toml worker
 
 ## 보안과 개인정보
 
-- 확장 프로그램 권한은 `bookmarks`, `nativeMessaging`, `storage` 중심입니다.
+- 확장 프로그램 권한은 `bookmarks`, `nativeMessaging`, `storage`, `notifications`, `alarms` 중심입니다.
 - `storage`는 브라우저 프로필별 `profile_id`와 최근 연결 상태를 저장하는 데 사용합니다.
+- `notifications`와 `alarms`는 worker 활동 로그를 주기적으로 확인하고 브라우저 알림을 띄우는 데 사용합니다.
 - 확장 프로그램은 파일 시스템에 직접 접근하지 않습니다.
 - 로컬 에이전트는 설정된 Vault 경로 아래에만 상태와 Markdown을 씁니다.
 - Ollama 호출은 `localhost` 기준입니다.
 - YouTube 영상 파일은 저장하지 않습니다.
 - 전체 웹페이지 아카이브를 저장하지 않습니다.
-- Windows 알림은 로컬 데스크톱 알림만 사용합니다.
+- 사용자 알림은 기본적으로 Chrome/Firefox 확장 알림으로 표시됩니다.
 - `config.toml`, `outputs/`, `work/`, SQLite DB, 실행 파일은 GitHub에 올리지 않습니다.
 
 ## 문제 해결

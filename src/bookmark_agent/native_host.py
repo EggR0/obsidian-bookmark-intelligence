@@ -8,6 +8,7 @@ import sys
 from .bookmark_import import ImportFilters, import_bookmarks
 from .config import AppConfig
 from .service import ingest_bookmark_event
+from .vault_state import state_dir
 
 
 def set_binary_stdio() -> None:
@@ -37,6 +38,30 @@ def _send_message(message: dict) -> None:
     sys.stdout.buffer.flush()
 
 
+def _recent_activity(config: AppConfig, after: str | None = None, limit: int = 20) -> dict:
+    path = state_dir(config) / "activity.jsonl"
+    if not path.exists():
+        return {"ok": True, "command": "recent-activity", "entries": []}
+
+    entries: list[dict] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            timestamp = entry.get("timestamp") or ""
+            if after and timestamp <= after:
+                continue
+            entries.append(entry)
+
+    return {
+        "ok": True,
+        "command": "recent-activity",
+        "entries": entries[-max(1, min(limit, 100)) :],
+    }
+
+
 def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
     command = message.get("command")
     if command == "import-bookmarks":
@@ -55,6 +80,13 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
         result = import_bookmarks(config, mode, filters, dry_run=bool(message.get("dry_run")))
         result["command"] = command
         return result
+
+    if command == "recent-activity":
+        return _recent_activity(
+            config,
+            after=message.get("after"),
+            limit=int(message.get("limit") or 20),
+        )
 
     if command != "ping":
         return None

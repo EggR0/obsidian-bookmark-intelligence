@@ -93,7 +93,7 @@ interval_seconds = 60
 
 [notifications]
 enabled = true
-desktop = true
+desktop = false
 activity_log = true
 activity_note = true
 print_to_console = true

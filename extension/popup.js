@@ -9,6 +9,8 @@ const detail = document.getElementById("detail");
 const testButton = document.getElementById("test-button");
 const previewIndexButton = document.getElementById("preview-index-button");
 const indexButton = document.getElementById("index-button");
+const downloadAgentButton = document.getElementById("download-agent-button");
+const settingsButton = document.getElementById("settings-button");
 
 function sendMessage(message) {
   if (isPromiseApi) {
@@ -110,6 +112,27 @@ async function runImportIndex(dryRun) {
 
 previewIndexButton.addEventListener("click", () => runImportIndex(true));
 indexButton.addEventListener("click", () => runImportIndex(false));
+
+async function openAgentDownload() {
+  const data = await getStorage(["settings"]);
+  const settings = data.settings || {};
+  const url = settings.agentDownloadUrl || "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest";
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+downloadAgentButton.addEventListener("click", () => {
+  openAgentDownload().catch((error) => {
+    detail.textContent = String(error && error.message ? error.message : error);
+  });
+});
+
+settingsButton.addEventListener("click", () => {
+  if (api.runtime.openOptionsPage) {
+    api.runtime.openOptionsPage();
+  } else {
+    window.open(api.runtime.getURL("options.html"), "_blank", "noopener,noreferrer");
+  }
+});
 
 getStorage(["lastStatus"])
   .then((data) => render(data.lastStatus))

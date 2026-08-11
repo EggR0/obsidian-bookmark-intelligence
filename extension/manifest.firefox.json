@@ -3,13 +3,27 @@
   "name": "Obsidian Bookmark Intelligence",
   "version": "0.1.0",
   "description": "Send bookmark changes to a local Obsidian bookmark intelligence agent.",
-  "permissions": ["bookmarks", "nativeMessaging", "storage"],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "permissions": ["alarms", "bookmarks", "nativeMessaging", "notifications", "storage"],
   "action": {
     "default_title": "Obsidian Bookmark Intelligence",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
     "default_popup": "popup.html"
   },
   "background": {
     "scripts": ["background.js"]
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   },
   "browser_specific_settings": {
     "gecko": {

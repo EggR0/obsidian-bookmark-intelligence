@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="options.css">
+    <title>Obsidian Bookmark Intelligence Settings</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Obsidian Bookmark Intelligence</h1>
+        <p id="status">Loading...</p>
+      </header>
+
+      <section>
+        <h2>Local agent</h2>
+        <label for="agent-download-url">Download URL</label>
+        <input id="agent-download-url" type="url" spellcheck="false">
+        <div class="row">
+          <button id="open-download-button" type="button">Open download</button>
+          <button id="test-native-button" type="button" class="secondary">Test native host</button>
+        </div>
+        <dl>
+          <div>
+            <dt>Vault</dt>
+            <dd id="vault-path">Unknown</dd>
+          </div>
+          <div>
+            <dt>Ollama model</dt>
+            <dd id="ollama-model">Unknown</dd>
+          </div>
+          <div>
+            <dt>Profile ID</dt>
+            <dd id="profile-id">Unknown</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Notifications</h2>
+        <label class="check">
+          <input id="notifications-enabled" type="checkbox">
+          <span>Use browser extension notifications</span>
+        </label>
+        <label class="check">
+          <input id="notify-queued" type="checkbox">
+          <span>Notify when a bookmark enters the queue</span>
+        </label>
+        <label class="check">
+          <input id="notify-succeeded" type="checkbox">
+          <span>Notify when an Obsidian summary is saved</span>
+        </label>
+        <label class="check">
+          <input id="notify-failed" type="checkbox">
+          <span>Notify when processing fails</span>
+        </label>
+        <label class="check">
+          <input id="activity-polling-enabled" type="checkbox">
+          <span>Poll local activity log for worker results</span>
+        </label>
+        <label for="poll-interval">Polling interval, minutes</label>
+        <input id="poll-interval" type="number" min="1" max="60" step="1">
+      </section>
+
+      <footer>
+        <button id="save-button" type="button">Save settings</button>
+        <button id="poll-button" type="button" class="secondary">Check activity now</button>
+      </footer>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

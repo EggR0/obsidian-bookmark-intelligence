@@ -23,6 +23,8 @@ def ingest_bookmark_event(config: AppConfig, payload: dict) -> dict:
     received_at = utc_now()
 
     resource_id = None
+    resource_type = None
+    process_status = None
     canonical_url = canonicalize_url(url) if url else None
     status = "removed" if event_type == "removed" else "active"
 
@@ -77,10 +79,13 @@ def ingest_bookmark_event(config: AppConfig, payload: dict) -> dict:
                 """,
                 (canonical_url, url, resource_type, title, received_at, received_at),
             )
-            resource_id = connection.execute(
-                "SELECT id FROM resources WHERE canonical_url = ?",
+            resource_row = connection.execute(
+                "SELECT id, process_status, resource_type FROM resources WHERE canonical_url = ?",
                 (canonical_url,),
-            ).fetchone()["id"]
+            ).fetchone()
+            resource_id = resource_row["id"]
+            process_status = resource_row["process_status"]
+            resource_type = resource_row["resource_type"]
 
     result = {
         "ok": True,
@@ -89,6 +94,8 @@ def ingest_bookmark_event(config: AppConfig, payload: dict) -> dict:
         "profile_id": profile_id,
         "bookmark_id": bookmark_id,
         "canonical_url": canonical_url,
+        "resource_type": resource_type,
+        "process_status": process_status,
         "resource_id": resource_id,
     }
     append_event_log(config, payload, result)

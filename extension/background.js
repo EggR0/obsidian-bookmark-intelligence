@@ -3,6 +3,17 @@ const HOST_NAME = "obsidian_bookmark_agent";
 const api = globalThis.browser || globalThis.chrome;
 const isPromiseApi = Boolean(globalThis.browser);
 const storageArea = api.storage && api.storage.local;
+const ACTIVITY_ALARM = "bookmark-agent-activity-poll";
+const DEFAULT_AGENT_DOWNLOAD_URL = "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest";
+const DEFAULT_SETTINGS = {
+  agentDownloadUrl: DEFAULT_AGENT_DOWNLOAD_URL,
+  notificationsEnabled: true,
+  notifyQueued: true,
+  notifySucceeded: true,
+  notifyFailed: true,
+  activityPollingEnabled: true,
+  pollIntervalMinutes: 1
+};
 
 function nowIso() {
   return new Date().toISOString();
@@ -53,6 +64,140 @@ async function getProfileId() {
   const profileId = randomId();
   await setStorage({ profileId });
   return profileId;
+}
+
+async function getSettings() {
+  const data = await getStorage(["settings"]);
+  return {
+    ...DEFAULT_SETTINGS,
+    ...((data && data.settings) || {})
+  };
+}
+
+async function saveSettings(settings) {
+  await setStorage({
+    settings: {
+      ...DEFAULT_SETTINGS,
+      ...(settings || {})
+    }
+  });
+  await configureActivityAlarm();
+}
+
+function createNotification(title, message) {
+  if (!api.notifications) return Promise.resolve();
+  return getSettings().then((settings) => {
+    if (!settings.notificationsEnabled) return null;
+    const notificationId = `obi-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const options = {
+      type: "basic",
+      iconUrl: api.runtime.getURL("icon128.png"),
+      title,
+      message
+    };
+
+    if (isPromiseApi) {
+      return api.notifications.create(notificationId, options);
+    }
+
+    return new Promise((resolve) => {
+      api.notifications.create(notificationId, options, resolve);
+    });
+  });
+}
+
+async function notifyQueued(response, eventType) {
+  const settings = await getSettings();
+  if (!settings.notifyQueued || eventType === "removed") return;
+  if (!response || !response.ok || !response.resource_id) return;
+  if (response.process_status && response.process_status !== "pending") return;
+  await createNotification(
+    "Bookmark queued",
+    `Saved to queue for ${response.resource_type || "resource"} processing.`
+  );
+}
+
+function activityNotification(entry) {
+  const title = entry.title || entry.resource_title || "Bookmark Agent";
+  if (entry.event_type === "processing_succeeded") {
+    return {
+      title: "Bookmark summary complete",
+      message: `${title} was saved to Obsidian.`
+    };
+  }
+  if (entry.event_type === "processing_failed") {
+    return {
+      title: "Bookmark processing failed",
+      message: entry.error || entry.message || title
+    };
+  }
+  return null;
+}
+
+async function configureActivityAlarm() {
+  if (!api.alarms) return;
+  const settings = await getSettings();
+  if (api.alarms.clear) {
+    if (isPromiseApi) {
+      await api.alarms.clear(ACTIVITY_ALARM);
+    } else {
+      await new Promise((resolve) => api.alarms.clear(ACTIVITY_ALARM, resolve));
+    }
+  }
+  if (!settings.activityPollingEnabled || !settings.notificationsEnabled) return;
+  api.alarms.create(ACTIVITY_ALARM, {
+    delayInMinutes: Math.max(1, Number(settings.pollIntervalMinutes) || 1),
+    periodInMinutes: Math.max(1, Number(settings.pollIntervalMinutes) || 1)
+  });
+}
+
+async function pollRecentActivity() {
+  const settings = await getSettings();
+  if (!settings.activityPollingEnabled || !settings.notificationsEnabled) return;
+
+  const stored = await getStorage(["lastActivityTimestamp"]);
+  const after = stored.lastActivityTimestamp;
+  if (!after) {
+    await setStorage({ lastActivityTimestamp: nowIso() });
+    return;
+  }
+
+  let response;
+  try {
+    response = await sendNativeRequest(
+      await withProfileId({
+        schema_version: 1,
+        command: "recent-activity",
+        after,
+        limit: 20,
+        source: {
+          browser: detectBrowser(),
+          extension: EXTENSION_NAME
+        },
+        event: {
+          type: "recent-activity",
+          timestamp: nowIso()
+        }
+      })
+    );
+  } catch (error) {
+    return;
+  }
+
+  const entries = response && Array.isArray(response.entries) ? response.entries : [];
+  let latest = after;
+  for (const entry of entries) {
+    if (entry.timestamp && entry.timestamp > latest) latest = entry.timestamp;
+    if (entry.event_type === "processing_succeeded" && !settings.notifySucceeded) continue;
+    if (entry.event_type === "processing_failed" && !settings.notifyFailed) continue;
+    const notification = activityNotification(entry);
+    if (notification) {
+      await createNotification(notification.title, notification.message);
+    }
+  }
+  if (latest !== after) {
+    await setStorage({ lastActivityTimestamp: latest });
+  }
 }
 
 function compactBookmark(node) {
@@ -120,6 +265,7 @@ function sendNativeMessage(message) {
           checkedAt: nowIso(),
           response: response || null
         });
+        notifyQueued(response, message.event && message.event.type).catch(() => {});
       })
       .catch((error) => {
         console.warn("Native message failed:", error);
@@ -270,3 +416,80 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   return true;
 });
+
+api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "get-extension-settings") {
+    return false;
+  }
+
+  Promise.all([getSettings(), getProfileId()])
+    .then(([settings, profileId]) => {
+      sendResponse({
+        ok: true,
+        settings,
+        profileId,
+        defaultAgentDownloadUrl: DEFAULT_AGENT_DOWNLOAD_URL
+      });
+    })
+    .catch((error) => {
+      sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error)
+      });
+    });
+  return true;
+});
+
+api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "save-extension-settings") {
+    return false;
+  }
+
+  saveSettings(message.settings)
+    .then(() => sendResponse({ ok: true }))
+    .catch((error) => {
+      sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error)
+      });
+    });
+  return true;
+});
+
+api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "poll-recent-activity") {
+    return false;
+  }
+
+  pollRecentActivity()
+    .then(() => sendResponse({ ok: true }))
+    .catch((error) => {
+      sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error)
+      });
+    });
+  return true;
+});
+
+if (api.alarms && api.alarms.onAlarm) {
+  api.alarms.onAlarm.addListener((alarm) => {
+    if (alarm && alarm.name === ACTIVITY_ALARM) {
+      pollRecentActivity().catch(() => {});
+    }
+  });
+}
+
+if (api.runtime.onInstalled) {
+  api.runtime.onInstalled.addListener(() => {
+    configureActivityAlarm().catch(() => {});
+  });
+}
+
+if (api.runtime.onStartup) {
+  api.runtime.onStartup.addListener(() => {
+    configureActivityAlarm().catch(() => {});
+  });
+}
+
+configureActivityAlarm().catch(() => {});
