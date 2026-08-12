@@ -803,6 +803,27 @@ bookmark-agent --config .\config.toml worker
 - 사용자 알림은 기본적으로 Chrome/Firefox 확장 알림으로 표시됩니다.
 - `config.toml`, `outputs/`, `work/`, SQLite DB, 실행 파일은 GitHub에 올리지 않습니다.
 
+## Obsidian 플러그인 배포
+
+Obsidian Community Plugin으로 등록되면 사용자는 Obsidian 안의 Community plugins 화면에서 `Bookmark Intelligence`를 설치할 수 있습니다.
+
+단, Obsidian 플러그인은 로컬 agent/server를 자동으로 설치하지 않습니다. 이 플러그인은 Obsidian 안에서 활동 노트와 북마크 인덱스를 열고, 로컬 agent와 브라우저 확장 프로그램 다운로드 위치를 안내하는 제어 패널입니다. 실제 북마크 감지, 본문 추출, YouTube 자막 조회, Ollama 요약, SQLite 큐 처리는 별도 로컬 agent가 담당합니다.
+
+로컬 요약을 쓰려면 Ollama와 선택한 모델을 실행할 수 있는 CPU/RAM/GPU 환경이 필요합니다. 낮은 사양의 컴퓨터에서는 작은 Ollama 모델을 설정하는 것이 좋습니다.
+
+수동으로 테스트하려면 Vault 안에 다음 폴더를 만들고 배포 파일을 복사합니다.
+
+```text
+<vault>/.obsidian/plugins/bookmark-intelligence/
+  main.js
+  manifest.json
+  styles.css
+```
+
+그 다음 Obsidian을 다시 로드하고 Settings -> Community plugins에서 `Bookmark Intelligence`를 켭니다.
+
+커뮤니티 플러그인 제출용 세부 절차는 `OBSIDIAN_PLUGIN_SUBMISSION.md`에 정리되어 있습니다.
+
 ## 문제 해결
 
 ### 팝업에서 Connected가 뜨지 않을 때
