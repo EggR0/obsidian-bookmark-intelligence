@@ -6,6 +6,8 @@ Chrome과 Firefox에서 새 북마크를 감지하고 핵심 요약 노트를 Ob
 
 무료 핵심은 `새 북마크 -> 본문/자막 추출 -> 요약 -> Markdown 노트 1개`입니다. 기존 북마크 대량 분석, 고급 중복 검토, 암호화 백업과 로그인은 별도 유료 Pro 기능으로 제공합니다.
 
+백업 Pro 기능은 Vault의 Markdown, 원문, 자막, API 키를 복사하지 않습니다. 앱 데이터의 SQLite 큐, 중복/재시도 상태, 활동 기록, 사용자 프롬프트만 검증된 ZIP으로 저장하며, 복원 시 동일 Vault인지 확인합니다.
+
 ## 목표
 
 - Chrome과 Firefox에서 북마크 생성, 수정, 이동, 삭제 이벤트를 실시간 감지합니다.
@@ -398,6 +400,15 @@ Ollama 꺼짐 또는 응답 없음
 ```powershell
 bookmark-agent --config .\config.toml doctor
 ```
+
+Pro 앱 상태 백업/복원:
+
+```powershell
+bookmark-agent --config .\config.toml backup --output .\bookmark-intelligence-state.zip
+bookmark-agent --config .\config.toml restore --input .\bookmark-intelligence-state.zip
+```
+
+무료 설치에서는 두 명령이 Pro 안내와 함께 종료됩니다. 복원 중에는 worker를 중지해야 하며, 복원 대상 Vault와 백업의 Vault 식별자가 다르면 거부됩니다.
 
 모델이 없다면 먼저 내려받습니다.
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 
 from .activity import record_activity
+from .backup import backup_state, restore_state
 from .bookmark_import import ImportFilters, import_bookmarks
 from .browser_scan import scan_browser_bookmarks
 from .config import load_config
@@ -58,6 +59,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("doctor", help="Check local setup")
     subparsers.add_parser("test-notification", help="Write one activity entry and show a desktop notification")
+    backup_parser = subparsers.add_parser("backup", help="Create a Pro app-state backup")
+    backup_parser.add_argument("--output", required=True, help="Destination .zip path")
+    restore_parser = subparsers.add_parser("restore", help="Restore a Pro app-state backup")
+    restore_parser.add_argument("--input", required=True, help="Backup .zip path")
     subparsers.add_parser("open-extension-setup", help="Open browser extension pages and outputs folder")
     scan = subparsers.add_parser("scan-bookmarks", help="Scan local Chrome/Firefox bookmark stores once")
     scan.add_argument("--dry-run", action="store_true", help="Count changes without enqueueing events")
@@ -122,6 +127,19 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     config = load_config(config_path)
+
+    if args.command in {"backup", "restore"} and not config.features.pro_enabled:
+        raise SystemExit(f"{args.command} is a Pro feature. Use the subscription-enabled desktop app.")
+
+    if args.command == "backup":
+        init_db(config.database.path)
+        print(json.dumps(backup_state(config, Path(args.output)), ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "restore":
+        init_db(config.database.path)
+        print(json.dumps(restore_state(config, Path(args.input)), ensure_ascii=False, indent=2))
+        return 0
 
     if args.command == "init-db":
         init_db(config.database.path)
