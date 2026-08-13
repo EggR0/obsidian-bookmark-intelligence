@@ -12,7 +12,7 @@ OUTPUT = ROOT / "outputs" / "obsidian-bookmark-intelligence-plugin.zip"
 
 def main() -> int:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    files = [SOURCE / "manifest.json", SOURCE / "main.js", SOURCE / "README.md", SOURCE / "versions.json"]
+    files = [SOURCE / "manifest.json", SOURCE / "main.js", SOURCE / "README.md", SOURCE / "versions.json", SOURCE / "styles.css"]
     missing = [str(path) for path in files if not path.exists()]
     if missing:
         raise SystemExit(f"Missing Obsidian plugin files: {', '.join(missing)}")

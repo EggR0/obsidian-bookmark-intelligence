@@ -1,126 +1,83 @@
-const { Plugin, PluginSettingTab, Setting, Notice, Platform } = require("obsidian");
+const { ItemView, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf } = require("obsidian");
+const crypto = require("crypto");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { spawn } = require("child_process");
 
+const VIEW_TYPE = "bookmark-intelligence-status";
 const DEFAULT_SETTINGS = {
-  agentReleaseUrl: "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest",
-  browserExtensionUrl: "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest",
-  activityNotePath: "Bookmarks/_Activity.md",
-  indexNotePath: "Bookmarks/_Index.md",
-  showHardwareWarning: true
+  agentCommand: process.platform === "win32" ? "bookmark-agent.exe" : "bookmark-agent",
+  configPath: "",
+  refreshSeconds: 30
 };
 
-module.exports = class ObsidianBookmarkIntelligencePlugin extends Plugin {
-  async onload() {
-    await this.loadSettings();
+function vaultPath(plugin) {
+  return plugin.app.vault.adapter.getBasePath();
+}
 
-    this.addRibbonIcon("bookmark", "Bookmark Intelligence", () => {
-      this.openActivityNote();
-    });
+function stateDirectory(plugin) {
+  const id = crypto.createHash("sha256").update(path.resolve(vaultPath(plugin))).digest("hex").slice(0, 16);
+  let root;
+  if (process.platform === "win32") root = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
+  else if (process.platform === "darwin") root = path.join(os.homedir(), "Library", "Application Support");
+  else root = process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state");
+  return path.join(root, "Bookmark Intelligence", id);
+}
 
-    this.addCommand({
-      id: "open-bookmark-activity",
-      name: "Open bookmark agent activity",
-      callback: () => this.openActivityNote()
-    });
+function configPath(plugin) {
+  return plugin.settings.configPath.trim() || path.join(vaultPath(plugin), "config.toml");
+}
 
-    this.addCommand({
-      id: "open-bookmark-index",
-      name: "Open bookmark index",
-      callback: () => this.openIndexNote()
-    });
+function readActivity(plugin) {
+  const activityPath = path.join(stateDirectory(plugin), "activity.jsonl");
+  if (!fs.existsSync(activityPath)) return [];
+  return fs.readFileSync(activityPath, "utf8").split(/\r?\n/).filter(Boolean).slice(-40).map((line) => {
+    try { return JSON.parse(line); } catch (_) { return null; }
+  }).filter(Boolean).reverse();
+}
 
-    this.addCommand({
-      id: "open-local-agent-release",
-      name: "Open local agent download",
-      callback: () => this.openExternal(this.settings.agentReleaseUrl)
-    });
-
-    this.addCommand({
-      id: "copy-install-command",
-      name: "Copy local agent install command",
-      callback: () => this.copyInstallCommand()
-    });
-
-    this.addSettingTab(new BookmarkIntelligenceSettingTab(this.app, this));
-
-    if (this.settings.showHardwareWarning) {
-      new Notice(
-        "Bookmark Intelligence requires the local agent, Ollama, and hardware capable of running the selected local model.",
-        9000
-      );
-    }
+class StatusView extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
   }
 
-  async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  getViewType() { return VIEW_TYPE; }
+  getDisplayText() { return "Bookmark Intelligence"; }
+  getIcon() { return "bookmark"; }
+
+  async onOpen() {
+    this.refresh();
   }
 
-  async saveSettings() {
-    await this.saveData(this.settings);
-  }
-
-  openActivityNote() {
-    this.openVaultFile(this.settings.activityNotePath);
-  }
-
-  openIndexNote() {
-    this.openVaultFile(this.settings.indexNotePath);
-  }
-
-  async openVaultFile(path) {
-    const file = this.app.vault.getAbstractFileByPath(path);
-    if (!file) {
-      new Notice(`${path} was not found. Run the local agent first.`);
+  refresh() {
+    const container = this.containerEl.children[1];
+    container.empty();
+    container.createEl("h2", { text: "Bookmark Intelligence" });
+    container.createEl("p", { text: `Activity: ${stateDirectory(this.plugin)}` });
+    const actions = container.createDiv({ cls: "bookmark-intelligence-actions" });
+    const refreshButton = actions.createEl("button", { text: "Refresh" });
+    refreshButton.addEventListener("click", () => this.refresh());
+    const runButton = actions.createEl("button", { text: "Run worker once" });
+    runButton.addEventListener("click", () => this.plugin.runWorkerOnce());
+    const entries = readActivity(this.plugin);
+    if (!entries.length) {
+      container.createEl("p", { text: "No local activity has been recorded yet." });
       return;
     }
-    await this.app.workspace.getLeaf(false).openFile(file);
-  }
-
-  openExternal(url) {
-    if (!url) {
-      new Notice("No URL configured.");
-      return;
-    }
-    if (Platform.isDesktopApp) {
-      try {
-        const { shell } = require("electron");
-        shell.openExternal(url);
-        return;
-      } catch (error) {
-        window.open(url);
-        return;
-      }
-    }
-    window.open(url);
-  }
-
-  getVaultPath() {
-    const adapter = this.app.vault.adapter;
-    if (adapter && typeof adapter.getBasePath === "function") {
-      return adapter.getBasePath();
-    }
-    return "";
-  }
-
-  installCommand() {
-    const vaultPath = this.getVaultPath() || "<VaultPath>";
-    if (Platform.isWin) {
-      return `powershell -ExecutionPolicy Bypass -File .\\install.ps1 -VaultPath "${vaultPath}"`;
-    }
-    return `./install.sh --vault-path "${vaultPath}"`;
-  }
-
-  async copyInstallCommand() {
-    const command = this.installCommand();
-    try {
-      await navigator.clipboard.writeText(command);
-      new Notice("Install command copied.");
-    } catch (error) {
-      new Notice(command, 12000);
+    const list = container.createEl("ul");
+    for (const entry of entries) {
+      const item = list.createEl("li");
+      const title = entry.title || entry.event_type || "Activity";
+      const time = entry.timestamp ? ` [${entry.timestamp}]` : "";
+      item.createEl("strong", { text: `${title}${time}` });
+      item.createEl("div", { text: entry.message || entry.details?.error || "" });
     }
   }
-};
+}
 
-class BookmarkIntelligenceSettingTab extends PluginSettingTab {
+class BookmarkIntelligenceSettings extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -129,103 +86,90 @@ class BookmarkIntelligenceSettingTab extends PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.addClass("obi-settings");
-
-    containerEl.createEl("h2", { text: "Obsidian Bookmark Intelligence" });
-    containerEl.createEl("p", {
-      text:
-        "This plugin is a control panel for the separately installed local bookmark agent. Summaries require Ollama and local hardware capable of running the selected model."
-    });
+    containerEl.createEl("h2", { text: "Bookmark Intelligence" });
+    containerEl.createEl("p", { text: "The Obsidian plugin is a local status and control surface. Chrome/Firefox capture still requires the browser extension and Native Messaging agent." });
+    containerEl.createEl("p", { text: "Local Ollama summarization requires hardware capable of running the selected model. Larger models may require substantial RAM and a compatible GPU." });
 
     new Setting(containerEl)
-      .setName("Local agent download")
-      .setDesc("Open the GitHub Releases page for installer scripts and native host assets.")
-      .addButton((button) =>
-        button.setButtonText("Open").onClick(() => this.plugin.openExternal(this.plugin.settings.agentReleaseUrl))
-      );
-
+      .setName("Agent command")
+      .setDesc("Executable name or absolute path for bookmark-agent.")
+      .addText((text) => text.setValue(this.plugin.settings.agentCommand).onChange(async (value) => {
+        this.plugin.settings.agentCommand = value.trim() || DEFAULT_SETTINGS.agentCommand;
+        await this.plugin.saveData(this.plugin.settings);
+      }));
     new Setting(containerEl)
-      .setName("Browser extension download")
-      .setDesc("Open the same Release page for Chrome and Firefox extension packages.")
-      .addButton((button) =>
-        button.setButtonText("Open").onClick(() => this.plugin.openExternal(this.plugin.settings.browserExtensionUrl))
-      );
-
+      .setName("Config path")
+      .setDesc("Absolute path to config.toml. Empty uses the vault root config.toml.")
+      .addText((text) => text.setValue(this.plugin.settings.configPath).onChange(async (value) => {
+        this.plugin.settings.configPath = value.trim();
+        await this.plugin.saveData(this.plugin.settings);
+      }));
     new Setting(containerEl)
-      .setName("Copy install command")
-      .setDesc("Copies the unified local agent install command using this vault path.")
-      .addButton((button) => button.setButtonText("Copy").onClick(() => this.plugin.copyInstallCommand()));
-
+      .setName("Activity refresh interval")
+      .setDesc("Seconds between status view refreshes.")
+      .addText((text) => text.setValue(String(this.plugin.settings.refreshSeconds)).onChange(async (value) => {
+        const seconds = Math.max(5, Math.min(3600, Number(value) || 30));
+        this.plugin.settings.refreshSeconds = seconds;
+        await this.plugin.saveData(this.plugin.settings);
+        this.plugin.configureRefresh();
+      }));
     new Setting(containerEl)
-      .setName("Agent release URL")
-      .setDesc("Used by the Open buttons above.")
-      .addText((text) =>
-        text
-          .setPlaceholder(DEFAULT_SETTINGS.agentReleaseUrl)
-          .setValue(this.plugin.settings.agentReleaseUrl)
-          .onChange(async (value) => {
-            this.plugin.settings.agentReleaseUrl = value.trim() || DEFAULT_SETTINGS.agentReleaseUrl;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Browser extension URL")
-      .setDesc("Normally this is the same GitHub Release page.")
-      .addText((text) =>
-        text
-          .setPlaceholder(DEFAULT_SETTINGS.browserExtensionUrl)
-          .setValue(this.plugin.settings.browserExtensionUrl)
-          .onChange(async (value) => {
-            this.plugin.settings.browserExtensionUrl = value.trim() || DEFAULT_SETTINGS.browserExtensionUrl;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Activity note path")
-      .setDesc("Path inside the vault.")
-      .addText((text) =>
-        text
-          .setPlaceholder(DEFAULT_SETTINGS.activityNotePath)
-          .setValue(this.plugin.settings.activityNotePath)
-          .onChange(async (value) => {
-            this.plugin.settings.activityNotePath = value.trim() || DEFAULT_SETTINGS.activityNotePath;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Index note path")
-      .setDesc("Path inside the vault.")
-      .addText((text) =>
-        text
-          .setPlaceholder(DEFAULT_SETTINGS.indexNotePath)
-          .setValue(this.plugin.settings.indexNotePath)
-          .onChange(async (value) => {
-            this.plugin.settings.indexNotePath = value.trim() || DEFAULT_SETTINGS.indexNotePath;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Show hardware warning on startup")
-      .setDesc("Reminds users that local summaries require Ollama and suitable CPU/RAM/GPU.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.showHardwareWarning).onChange(async (value) => {
-          this.plugin.settings.showHardwareWarning = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Open activity note")
-      .setDesc("Open the agent activity log note if it exists.")
-      .addButton((button) => button.setButtonText("Open").onClick(() => this.plugin.openActivityNote()));
-
-    new Setting(containerEl)
-      .setName("Open bookmark index")
-      .setDesc("Open the generated bookmark index if it exists.")
-      .addButton((button) => button.setButtonText("Open").onClick(() => this.plugin.openIndexNote()));
+      .setName("Open status view")
+      .setDesc("Show the latest local queue and worker activity.")
+      .addButton((button) => button.setButtonText("Open").onClick(() => this.plugin.activateView()));
   }
 }
+
+module.exports = class BookmarkIntelligencePlugin extends Plugin {
+  async onload() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.registerView(VIEW_TYPE, (leaf) => new StatusView(leaf, this));
+    this.addRibbonIcon("bookmark", "Open Bookmark Intelligence", () => this.activateView());
+    this.addCommand({ id: "open-status", name: "Open status", callback: () => this.activateView() });
+    this.addCommand({ id: "refresh-status", name: "Refresh status", callback: () => this.refreshViews() });
+    this.addCommand({ id: "run-worker-once", name: "Run worker once", callback: () => this.runWorkerOnce() });
+    this.addSettingTab(new BookmarkIntelligenceSettings(this.app, this));
+    this.configureRefresh();
+  }
+
+  configureRefresh() {
+    if (this.refreshTimer) window.clearInterval(this.refreshTimer);
+    this.refreshTimer = window.setInterval(() => this.refreshViews(), this.settings.refreshSeconds * 1000);
+    this.registerInterval(this.refreshTimer);
+  }
+
+  refreshViews() {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) leaf.view.refresh();
+  }
+
+  async activateView() {
+    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+    if (existing.length) {
+      this.app.workspace.revealLeaf(existing[0]);
+      existing[0].view.refresh();
+      return;
+    }
+    const leaf = this.app.workspace.getRightLeaf(false) || this.app.workspace.getLeaf(false);
+    await leaf.setViewState({ type: VIEW_TYPE, active: true });
+    this.app.workspace.revealLeaf(leaf);
+  }
+
+  runWorkerOnce() {
+    const command = this.settings.agentCommand.trim();
+    if (!command) {
+      new Notice("Configure the Bookmark Intelligence agent command first.");
+      return;
+    }
+    const child = spawn(command, ["--config", configPath(this), "worker", "--once"], { windowsHide: true });
+    child.once("error", (error) => new Notice(`Could not start bookmark-agent: ${error.message}`));
+    child.once("exit", (code) => {
+      new Notice(code === 0 ? "Bookmark worker finished." : `Bookmark worker exited with code ${code}.`);
+      this.refreshViews();
+    });
+    new Notice("Bookmark worker started.");
+  }
+
+  onunload() {
+    if (this.refreshTimer) window.clearInterval(this.refreshTimer);
+  }
+};

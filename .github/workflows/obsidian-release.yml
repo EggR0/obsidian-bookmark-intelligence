@@ -1,0 +1,42 @@
+name: Build Obsidian Plugin Release
+
+on:
+  push:
+    tags:
+      - "0.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate plugin metadata
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("manifest.json").read_text())
+          versions = json.loads(Path("versions.json").read_text())
+          if manifest["version"] not in versions:
+              raise SystemExit("manifest version is missing from versions.json")
+          if versions[manifest["version"]] != manifest["minAppVersion"]:
+              raise SystemExit("manifest and versions metadata disagree")
+          for name in ("main.js", "manifest.json", "styles.css"):
+              if not Path(name).is_file():
+                  raise SystemExit(f"missing official plugin file: {name}")
+          PY
+      - name: Publish exact Obsidian tag
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: false
+          make_latest: false
+          body: "Obsidian Community Plugin release for Bookmark Intelligence ${{ github.ref_name }}."
+          files: |
+            main.js
+            manifest.json
+            styles.css
