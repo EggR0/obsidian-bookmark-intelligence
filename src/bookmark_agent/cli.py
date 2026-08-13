@@ -26,6 +26,23 @@ from .service import ingest_bookmark_event
 from .worker import run_worker
 
 
+def _print_json(payload: object) -> None:
+    """Print JSON without letting a legacy Windows console crash the command."""
+    line = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    try:
+        print(line, end="", flush=True)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        encoded = line.encode(encoding, errors="replace")
+        buffer = getattr(sys.stdout, "buffer", None)
+        if buffer is not None:
+            buffer.write(encoded)
+            buffer.flush()
+        else:
+            sys.stdout.write(encoded.decode(encoding, errors="replace"))
+            sys.stdout.flush()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="bookmark-agent")
     parser.add_argument("--config", default="config.toml", help="Path to config.toml")
@@ -139,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "refresh-entitlement":
         try:
-            print(json.dumps(refresh_entitlement(config), ensure_ascii=False, indent=2))
+            _print_json(refresh_entitlement(config))
         except ValueError as error:
             raise SystemExit(f"Could not refresh entitlement: {error}") from error
         return 0
@@ -156,12 +173,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "backup":
         init_db(config.database.path)
-        print(json.dumps(backup_state(config, Path(args.output)), ensure_ascii=False, indent=2))
+        _print_json(backup_state(config, Path(args.output)))
         return 0
 
     if args.command == "restore":
         init_db(config.database.path)
-        print(json.dumps(restore_state(config, Path(args.input)), ensure_ascii=False, indent=2))
+        _print_json(restore_state(config, Path(args.input)))
         return 0
 
     if args.command == "duplicate-report":
@@ -173,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
             url_contains=args.url_contains,
             resource_type=args.resource_type,
         )
-        print(json.dumps({"ok": True, "groups": find_duplicate_groups(filters)}, ensure_ascii=False, indent=2))
+        _print_json({"ok": True, "groups": find_duplicate_groups(filters)})
         return 0
 
     if args.command == "init-db":
@@ -237,13 +254,13 @@ def main(argv: list[str] | None = None) -> int:
                 "change": {},
             },
         )
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        _print_json(result)
         return 0
 
     if args.command == "scan-bookmarks":
         init_db(config.database.path)
         result = scan_browser_bookmarks(config, dry_run=args.dry_run or args.mark_seen, mark_seen=args.mark_seen)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        _print_json(result)
         return 0
 
     if args.command == "import-bookmarks":
@@ -260,7 +277,7 @@ def main(argv: list[str] | None = None) -> int:
             limit=args.limit,
         )
         result = import_bookmarks(config, args.mode, filters, dry_run=args.dry_run)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        _print_json(result)
         return 0
 
     if args.command == "doctor":
