@@ -73,6 +73,9 @@ def ingest_bookmark_event(config: AppConfig, payload: dict) -> dict:
                   title = COALESCE(NULLIF(excluded.title, ''), resources.title),
                   updated_at = excluded.updated_at,
                   process_status = CASE
+                    WHEN NULLIF(excluded.title, '') IS NOT NULL
+                         AND NULLIF(excluded.title, '') != COALESCE(resources.title, '')
+                      THEN 'pending'
                     WHEN resources.process_status = 'succeeded' THEN resources.process_status
                     ELSE 'pending'
                   END
