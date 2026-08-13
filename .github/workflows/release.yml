@@ -70,6 +70,16 @@ jobs:
             "$hash  $(Split-Path -Leaf $file)"
           }
           $lines | Set-Content -Encoding ascii outputs/SHA256SUMS.txt
+      - name: Verify release archives
+        shell: pwsh
+        run: >-
+          python scripts/verify_release_archives.py
+          --version "${{ github.ref_name }}"
+          outputs/bookmark-intelligence-windows.zip
+          outputs/bookmark-intelligence-source.zip
+          outputs/chrome-extension.zip
+          outputs/firefox-extension.xpi
+          outputs/obsidian-bookmark-intelligence-plugin.zip
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
