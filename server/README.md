@@ -63,9 +63,9 @@ Invoke-RestMethod http://127.0.0.1:8787/v1/team/members -Method Post -Headers @{
 Invoke-RestMethod http://127.0.0.1:8787/v1/team/members -Headers @{Authorization="Bearer <owner-or-member-token>"}
 ```
 
-Duo supports 2 total seats, Team supports 5 total seats, and Enterprise has no enforced seat cap in this reference service. A member uses their own login token, while the owner's subscription and shared credits are charged. `POST /v1/team/members/remove` removes a member. Production deployments should add email invitations, verification, audit logs, and organization administration before treating this as a complete enterprise identity system.
+Duo supports 2 total seats, Team supports 5 total seats, and Enterprise has no enforced seat cap in this reference service. A member uses their own login token, while the owner's subscription and shared credits are charged. `POST /v1/team/members/remove` removes a member. The included service also provides email verification, password-reset tokens, expiring email invites, and owner-visible audit events. A production deployment still needs a real SMTP/transactional-email configuration, HTTPS, secret management, abuse monitoring, and organization-specific administration policies.
 
-The reference service also supports a secure invite handoff for already registered accounts. The owner creates an invite by email; the response contains the one-time token, which an external mailer or administrator can deliver to that user:
+The reference service also supports a secure invite handoff. The owner creates an invite by email; when SMTP is configured the service sends the invite message, otherwise the response contains the one-time token for a local administrator to deliver:
 
 ```powershell
 $invite = Invoke-RestMethod http://127.0.0.1:8787/v1/team/invites -Method Post -Headers @{Authorization="Bearer <owner-token>"} -ContentType application/json -Body (@{member_email="member@example.com";ttl_hours=72} | ConvertTo-Json)
@@ -73,7 +73,7 @@ Invoke-RestMethod http://127.0.0.1:8787/v1/team/invites/accept -Method Post -Hea
 Invoke-RestMethod http://127.0.0.1:8787/v1/team/audit -Headers @{Authorization="Bearer <owner-token>"}
 ```
 
-Only the token hash is stored, it expires, it is bound to the invited account, and it cannot be accepted twice. The included service does not send email itself. Team invite creation, acceptance, and removal are recorded in the owner-visible audit feed.
+Only the token hash is stored, it expires, it is bound to the invited account, and it cannot be accepted twice. Team invite creation, acceptance, and removal are recorded in the owner-visible audit feed. Set `REQUIRE_EMAIL_VERIFICATION=1` to require verified email addresses before login; configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, and `SMTP_STARTTLS` for delivery. Password-reset action tokens are never returned by default; `EXPOSE_AUTH_ACTION_TOKENS=1` is intended only for controlled local development.
 
 Run the optional hosted gateway separately:
 

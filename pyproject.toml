@@ -21,6 +21,9 @@ build = [
   "cryptography>=42.0",
   "pyinstaller>=6.0"
 ]
+test = [
+  "pytest>=8.0"
+]
 
 [project.scripts]
 bookmark-agent = "bookmark_agent.cli:main"
