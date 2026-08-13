@@ -16,7 +16,7 @@ Chrome과 Firefox에서 새 북마크를 감지하고 핵심 요약 노트를 Ob
 - 요약은 기본적으로 로컬 Ollama 모델을 사용합니다.
 - Obsidian에는 읽기 좋은 핵심 Markdown만 저장합니다.
 - SQLite는 Obsidian을 대체하는 DB가 아니라, Vault 밖 앱 데이터 폴더에서 중복 방지와 재시도를 위한 내부 작업 큐로만 사용합니다.
-- 처리 과정과 완료 결과를 Obsidian 활동 노트, JSONL 로그, 브라우저 확장 알림으로 보여줍니다.
+- 처리 과정과 완료 결과를 앱 데이터 JSONL 로그, 콘솔, 브라우저 확장 알림으로 보여줍니다.
 
 ## 현재 기본 구성
 
@@ -690,7 +690,7 @@ bookmark-agent --config .\config.toml install-worker-startup --command-path .\ou
 bookmark-agent --config .\config.toml doctor
 ```
 
-알림과 활동 노트 테스트:
+알림과 활동 로그 테스트:
 
 ```powershell
 bookmark-agent --config .\config.toml test-notification

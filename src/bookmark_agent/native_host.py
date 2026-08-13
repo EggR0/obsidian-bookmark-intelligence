@@ -74,6 +74,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
             "notes_subdir": config.obsidian.notes_subdir,
             "provider": config.summarizer.provider,
             "model": config.summarizer.model,
+            "plan": "Pro" if config.features.pro_enabled else "Free",
             "summary_prompt": read_summary_prompt(config),
             "default_summary_prompt": DEFAULT_SUMMARY_PROMPT,
             "summary_prompt_path": str(prompt_path(config)),
@@ -93,9 +94,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
     if command == "import-bookmarks":
         if not config.features.pro_enabled:
             return {"ok": False, "error": "Existing bookmark bulk analysis is a Pro feature."}
-        mode = message.get("mode") or "index"
-        if mode != "index":
-            return {"ok": False, "error": "Native import currently supports index mode only."}
+        mode = message.get("mode") or "summarize"
         filters = ImportFilters(
             browser=message.get("browser"),
             profile=message.get("profile"),
@@ -126,6 +125,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
         "notes_subdir": config.obsidian.notes_subdir,
         "provider": config.summarizer.provider,
         "model": config.summarizer.model,
+        "plan": "Pro" if config.features.pro_enabled else "Free",
     }
 
 

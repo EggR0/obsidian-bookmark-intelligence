@@ -13,6 +13,7 @@ const summaryPrompt = document.getElementById("summary-prompt");
 const vaultPath = document.getElementById("vault-path");
 const aiProvider = document.getElementById("ai-provider");
 const aiModel = document.getElementById("ai-model");
+const plan = document.getElementById("plan");
 const profileId = document.getElementById("profile-id");
 const promptPath = document.getElementById("prompt-path");
 const openDownloadButton = document.getElementById("open-download-button");
@@ -104,6 +105,7 @@ async function testNativeHost() {
     vaultPath.textContent = response.vault_path || "Unknown";
     aiProvider.textContent = response.provider || "Unknown";
     aiModel.textContent = response.model || "Unknown";
+    plan.textContent = response.plan || "Free";
     statusText.textContent = "Native host connected.";
   } finally {
     testNativeButton.disabled = false;
@@ -121,6 +123,7 @@ async function loadAgentSettings() {
   vaultPath.textContent = response.vault_path || vaultPath.textContent;
   aiProvider.textContent = response.provider || aiProvider.textContent;
   aiModel.textContent = response.model || aiModel.textContent;
+  plan.textContent = response.plan || plan.textContent;
 }
 
 async function saveSummaryPrompt() {
