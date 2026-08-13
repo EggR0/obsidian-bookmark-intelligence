@@ -68,10 +68,13 @@ def _recent_activity(config: AppConfig, after: str | None = None, limit: int = 2
 
 def _queue_counts(config: AppConfig) -> dict[str, int]:
     init_db(config.database.path)
-    with connect(config.database.path) as connection:
+    connection = connect(config.database.path)
+    try:
         rows = connection.execute(
             "SELECT process_status, COUNT(*) AS count FROM resources GROUP BY process_status"
         ).fetchall()
+    finally:
+        connection.close()
     counts = {"pending": 0, "processing": 0, "failed": 0, "succeeded": 0}
     for row in rows:
         counts[str(row["process_status"])] = int(row["count"])
