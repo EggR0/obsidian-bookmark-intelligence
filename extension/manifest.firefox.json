@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Bookmark Intelligence",
-  "version": "0.2.25",
-  "description": "Summarize Firefox bookmarks into compact Obsidian Markdown notes with a local or user-configured AI provider.",
+  "version": "0.2.26",
+  "description": "Firefox bookmark summaries for Obsidian. Requires a local agent and hardware for Ollama or your selected AI model.",
+  "homepage_url": "https://eggr0.github.io/obsidian-bookmark-intelligence/",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
