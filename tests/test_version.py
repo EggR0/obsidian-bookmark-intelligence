@@ -28,6 +28,10 @@ class VersionTests(unittest.TestCase):
         root = Path(__file__).parents[1]
         manifest = json.loads((root / "extension" / "manifest.firefox.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["browser_specific_settings"]["gecko"]["id"], "bookmark-intelligence@eggr0.github.io")
+        self.assertEqual(
+            manifest["browser_specific_settings"]["gecko"]["data_collection_permissions"],
+            {"required": ["bookmarksInfo"]},
+        )
 
     def test_extension_download_defaults_cover_all_desktop_platforms(self) -> None:
         source = (Path(__file__).parents[1] / "extension" / "background.js").read_text(encoding="utf-8")
