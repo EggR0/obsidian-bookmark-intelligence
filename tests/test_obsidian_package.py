@@ -29,3 +29,8 @@ class ObsidianPackageTests(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         for name in ("manifest.json", "main.js", "styles.css", "versions.json"):
             self.assertGreaterEqual(workflow.count(name), 2, name)
+
+    def test_release_workflow_removes_generated_python_caches(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertIn("Remove generated Python caches", workflow)
+        self.assertIn("__pycache__", workflow)

@@ -30,6 +30,19 @@ jobs:
           --workpath work/pyinstaller-build
           --specpath work/pyinstaller-spec
           scripts/native_host_launcher.py
+      - name: Remove generated Python caches
+        shell: pwsh
+        run: |
+          $roots = @('src', 'server', 'scripts', 'extension', 'obsidian-plugin')
+          foreach ($root in $roots) {
+            if (Test-Path $root) {
+              Get-ChildItem -LiteralPath $root -Recurse -Directory -Force |
+                Where-Object { $_.Name -eq '__pycache__' } |
+                Remove-Item -Recurse -Force
+              Get-ChildItem -LiteralPath $root -Recurse -File -Force -Filter '*.pyc' |
+                Remove-Item -Force
+            }
+          }
       - name: Create source bundle
         shell: pwsh
         run: Compress-Archive -Path README.md,SPEC.md,STORE_SUBMISSION.md,MONETIZATION.md,OBSIDIAN_PLUGIN_SUBMISSION.md,manifest.json,main.js,styles.css,versions.json,config.example.toml,extension,obsidian-plugin,src,server,scripts,install.ps1,install.sh,pyproject.toml -DestinationPath outputs/bookmark-intelligence-source.zip
