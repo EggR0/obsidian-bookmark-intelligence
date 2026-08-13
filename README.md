@@ -1,5 +1,9 @@
 # Bookmark Intelligence
 
+설치 페이지: [GitHub Pages](https://eggr0.github.io/obsidian-bookmark-intelligence/)
+
+GitHub Pages는 `site/`의 정적 설치 안내를 `main` 브랜치에 반영할 때 자동 배포합니다. 저장소 관리자 화면에서 Pages의 source를 `GitHub Actions`로 한 번 활성화해야 공개 URL이 동작합니다.
+
 Chrome과 Firefox 북마크를 로컬에서 감지하고, 중복을 정리한 뒤, 핵심 요약만 Obsidian Markdown 노트로 남기는 로컬 우선 북마크 정리 도구입니다.
 
 Chrome과 Firefox에서 새 북마크를 감지하고 핵심 요약 노트를 Obsidian에 만드는 로컬 우선 도구입니다. 광고와 일일 사용량 제한 없이 Ollama 또는 사용자가 직접 연결한 AI API를 선택합니다.
