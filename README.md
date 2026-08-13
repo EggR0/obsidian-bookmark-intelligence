@@ -379,7 +379,7 @@ $env:BOOKMARK_INTELLIGENCE_ACCESS_TOKEN = "사용자 액세스 토큰"
 bookmark-agent --config .\config.toml refresh-entitlement
 ```
 
-agent는 plan, 기능 목록, 만료 시각만 앱 데이터에 캐시하며 액세스 토큰은 저장하지 않습니다. entitlement 서버가 설정된 경우 Pro 기능 확인 시 15분보다 오래된 캐시만 자동 갱신하고, 서버가 일시적으로 unavailable이면 기존 캐시로 동작합니다. 만료되거나 비활성화된 entitlement는 Free로 처리됩니다. `features.pro_enabled = true`는 결제 우회가 아니라 로컬 개발·테스트용 override로만 사용해야 합니다.
+agent는 plan, 기능 목록, 만료 시각만 앱 데이터에 캐시하며 액세스 토큰은 저장하지 않습니다. entitlement 서버가 설정된 경우 Pro 기능 확인 시 15분보다 오래된 캐시만 자동 갱신하고, 서버가 일시적으로 unavailable이면 기존 캐시로 동작합니다. 만료되거나 비활성화된 entitlement는 Free로 처리됩니다. 개발 테스트에서만 `BOOKMARK_INTELLIGENCE_DEV_PRO=1` 환경 변수를 일시적으로 사용할 수 있으며, 설정 파일의 값으로는 Pro 기능을 활성화할 수 없습니다.
 
 ### 후원 링크
 

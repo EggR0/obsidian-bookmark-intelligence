@@ -100,9 +100,6 @@ notify_on_start = false
 notify_on_success = true
 notify_on_failure = true
 
-[features]
-pro_enabled = false
-
 [support]
 github = ""
 polar = ""

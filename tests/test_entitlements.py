@@ -30,6 +30,14 @@ class EntitlementTests(unittest.TestCase):
             self.assertFalse(has_feature(config, "backup"))
             self.assertEqual(current_plan(config), "Free")
 
+    def test_user_config_cannot_grant_pro_without_development_environment(self) -> None:
+        config = replace(self.base, features=replace(self.base.features, pro_enabled=True))
+        with patch.dict(os.environ, {"BOOKMARK_INTELLIGENCE_DEV_PRO": ""}):
+            self.assertFalse(has_feature(config, "bulk_analysis"))
+        with patch.dict(os.environ, {"BOOKMARK_INTELLIGENCE_DEV_PRO": "1"}):
+            self.assertTrue(has_feature(config, "bulk_analysis"))
+            self.assertEqual(current_plan(config), "Pro (development override)")
+
     def test_refresh_caches_only_entitlement_fields(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             config = replace(

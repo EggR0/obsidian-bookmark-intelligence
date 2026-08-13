@@ -154,7 +154,7 @@ API keys are read only from the environment variable named by `api_key_env`. The
 
 ## Entitlement Contract
 
-An optional `[entitlements]` service returns `plan`, `status`, `features`, and `expires_at` for an account. `refresh-entitlement` caches only those fields in OS app data. The access token is read from `access_token_env` and is never cached. Pro commands require their corresponding feature: `bulk_analysis`, `duplicate_report`, `backup`, or `restore`. An expired or inactive response is treated as Free.
+An optional `[entitlements]` service returns `plan`, `status`, `features`, and `expires_at` for an account. `refresh-entitlement` caches only those fields in OS app data. The access token is read from `access_token_env` and is never cached. Pro commands require their corresponding feature: `bulk_analysis`, `duplicate_report`, `backup`, or `restore`. An expired or inactive response is treated as Free. A development override is available only through the process environment variable `BOOKMARK_INTELLIGENCE_DEV_PRO=1`; user-editable TOML cannot grant Pro access.
 
 When an entitlement endpoint and access-token environment variable are configured, feature checks refresh a stale cache at most once every 15 minutes. A failed refresh falls back to the existing cache; an unconfigured endpoint never creates a network request.
 

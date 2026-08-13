@@ -16,6 +16,11 @@ PRO_FEATURES = {"bulk_analysis", "duplicate_report", "backup", "restore"}
 ENTITLEMENT_REFRESH_INTERVAL = timedelta(minutes=15)
 
 
+def _development_override_enabled() -> bool:
+    """Keep the local Pro bypass out of user-editable configuration files."""
+    return os.environ.get("BOOKMARK_INTELLIGENCE_DEV_PRO", "") == "1"
+
+
 def entitlement_path(config: AppConfig) -> Path:
     return state_dir(config) / ENTITLEMENT_CACHE
 
@@ -64,7 +69,7 @@ def refresh_if_stale(config: AppConfig) -> dict:
 
 
 def has_feature(config: AppConfig, feature: str) -> bool:
-    if config.features.pro_enabled:
+    if _development_override_enabled():
         return True
     if feature not in PRO_FEATURES:
         return False
@@ -73,7 +78,7 @@ def has_feature(config: AppConfig, feature: str) -> bool:
 
 
 def current_plan(config: AppConfig) -> str:
-    if config.features.pro_enabled:
+    if _development_override_enabled():
         return "Pro (development override)"
     payload = refresh_if_stale(config)
     return str(payload.get("plan") or "Free") if _active(payload) else "Free"

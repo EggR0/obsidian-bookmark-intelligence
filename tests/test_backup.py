@@ -22,7 +22,6 @@ class BackupTests(unittest.TestCase):
                 base_config,
                 obsidian=replace(base_config.obsidian, vault_path=vault),
                 database=replace(base_config.database, path=root / "state.sqlite3"),
-                features=replace(base_config.features, pro_enabled=True),
             )
             init_db(config.database.path)
             connection = connect(config.database.path)
