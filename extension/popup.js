@@ -59,7 +59,9 @@ function render(status) {
   }
 
   const version = response.agent_version ? `Agent ${response.agent_version}` : "Agent version unknown";
-  detail.textContent = `${version} | Queue: ${response.database_path || "unknown"}`;
+  const queue = response.queue || {};
+  const queueText = `pending ${queue.pending || 0}, processing ${queue.processing || 0}, failed ${queue.failed || 0}`;
+  detail.textContent = `${version} | Queue ${queueText}`;
 }
 
 async function testConnection() {

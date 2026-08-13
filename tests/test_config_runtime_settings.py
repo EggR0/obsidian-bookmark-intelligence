@@ -14,7 +14,8 @@ class RuntimeSettingsTests(unittest.TestCase):
     def test_ping_reports_agent_version(self) -> None:
         base = load_config(Path("config.toml"))
         response = _handle_control_message(base, {"command": "ping"})
-        self.assertEqual(response["agent_version"], "0.2.33")
+        self.assertEqual(response["agent_version"], "0.2.34")
+        self.assertEqual(set(response["queue"]), {"pending", "processing", "failed", "succeeded"})
 
     def test_runtime_ai_settings_are_applied_without_storing_secret(self) -> None:
         base = load_config(Path("config.toml"))
