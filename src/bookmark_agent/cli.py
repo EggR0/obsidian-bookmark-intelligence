@@ -11,6 +11,7 @@ from .bookmark_import import ImportFilters, find_duplicate_groups, import_bookma
 from .browser_scan import scan_browser_bookmarks
 from .config import load_config
 from .database import init_db
+from .entitlements import current_plan, has_feature, refresh_entitlement
 from .installer import (
     detect_vault_path,
     doctor,
@@ -63,6 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
     backup_parser.add_argument("--output", required=True, help="Destination .zip path")
     restore_parser = subparsers.add_parser("restore", help="Restore a Pro app-state backup")
     restore_parser.add_argument("--input", required=True, help="Backup .zip path")
+    subparsers.add_parser("refresh-entitlement", help="Refresh paid plan entitlement from the configured service")
     duplicate_parser = subparsers.add_parser("duplicate-report", help="Create a Pro duplicate bookmark report")
     duplicate_parser.add_argument("--browser", choices=["chrome", "firefox"], help="Filter scanned browser source")
     duplicate_parser.add_argument("--profile", help="Filter profile name substring")
@@ -135,7 +137,18 @@ def main(argv: list[str] | None = None) -> int:
 
     config = load_config(config_path)
 
-    if args.command in {"backup", "restore", "duplicate-report"} and not config.features.pro_enabled:
+    if args.command == "refresh-entitlement":
+        print(json.dumps(refresh_entitlement(config), ensure_ascii=False, indent=2))
+        return 0
+
+    feature_by_command = {
+        "backup": "backup",
+        "restore": "restore",
+        "duplicate-report": "duplicate_report",
+        "import-bookmarks": "bulk_analysis",
+    }
+    required_feature = feature_by_command.get(args.command)
+    if required_feature and not has_feature(config, required_feature):
         raise SystemExit(f"{args.command} is a Pro feature. Use the subscription-enabled desktop app.")
 
     if args.command == "backup":
@@ -232,8 +245,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "import-bookmarks":
         init_db(config.database.path)
-        if not config.features.pro_enabled:
-            raise SystemExit("Existing bookmark bulk analysis is a Pro feature. Use the subscription-enabled desktop app.")
         if args.mode == "summarize" and args.limit is None and not args.all and not args.dry_run:
             raise SystemExit("summarize mode can enqueue many jobs. Use --limit N or --all.")
         filters = ImportFilters(

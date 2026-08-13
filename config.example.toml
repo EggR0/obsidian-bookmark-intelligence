@@ -45,3 +45,10 @@ patreon = ""
 paypal = ""
 toss = ""
 custom = ""
+
+[entitlements]
+# Optional paid-plan service. The access token is read from the named environment variable.
+endpoint = ""
+account_id = ""
+access_token_env = "BOOKMARK_INTELLIGENCE_ACCESS_TOKEN"
+timeout_seconds = 10

@@ -360,6 +360,17 @@ timeout_seconds = 120
 
 API 키는 환경 변수로만 읽으며 SQLite, 로그, Vault, Markdown에 저장하지 않습니다.
 
+### Pro entitlement
+
+결제 서비스가 준비되면 `[entitlements]`에 entitlement endpoint와 account ID를 지정하고 다음 명령으로 구독 상태를 갱신합니다.
+
+```powershell
+$env:BOOKMARK_INTELLIGENCE_ACCESS_TOKEN = "사용자 액세스 토큰"
+bookmark-agent --config .\config.toml refresh-entitlement
+```
+
+agent는 plan, 기능 목록, 만료 시각만 앱 데이터에 캐시하며 액세스 토큰은 저장하지 않습니다. 만료되거나 비활성화된 entitlement는 Free로 처리됩니다. `features.pro_enabled = true`는 결제 우회가 아니라 로컬 개발·테스트용 override로만 사용해야 합니다.
+
 ### 후원 링크
 
 확장 프로그램 설정 페이지는 `config.toml`의 `[support]`에 실제 URL이 입력된 채널만 표시합니다. GitHub Sponsors, Polar, Ko-fi, Buy Me a Coffee, Patreon, PayPal, Toss, 사용자 지정 링크를 지원합니다. 계정이 없는 채널은 빈 값으로 두며 가짜 링크를 표시하지 않습니다.

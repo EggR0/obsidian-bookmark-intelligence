@@ -7,6 +7,7 @@ import sys
 
 from .bookmark_import import ImportFilters, import_bookmarks
 from .config import AppConfig
+from .entitlements import current_plan, has_feature
 from .service import ingest_bookmark_event
 from .summarizer import DEFAULT_SUMMARY_PROMPT, prompt_path, read_summary_prompt, write_summary_prompt
 from .vault_state import state_dir
@@ -74,7 +75,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
             "notes_subdir": config.obsidian.notes_subdir,
             "provider": config.summarizer.provider,
             "model": config.summarizer.model,
-            "plan": "Pro" if config.features.pro_enabled else "Free",
+            "plan": current_plan(config),
             "support_links": config.support.links,
             "summary_prompt": read_summary_prompt(config),
             "default_summary_prompt": DEFAULT_SUMMARY_PROMPT,
@@ -93,7 +94,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
         }
 
     if command == "import-bookmarks":
-        if not config.features.pro_enabled:
+        if not has_feature(config, "bulk_analysis"):
             return {"ok": False, "error": "Existing bookmark bulk analysis is a Pro feature."}
         mode = message.get("mode") or "summarize"
         filters = ImportFilters(
@@ -126,7 +127,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
         "notes_subdir": config.obsidian.notes_subdir,
         "provider": config.summarizer.provider,
         "model": config.summarizer.model,
-        "plan": "Pro" if config.features.pro_enabled else "Free",
+        "plan": current_plan(config),
         "support_links": config.support.links,
     }
 

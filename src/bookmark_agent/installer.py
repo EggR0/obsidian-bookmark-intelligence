@@ -113,6 +113,12 @@ paypal = ""
 toss = ""
 custom = ""
 
+[entitlements]
+endpoint = ""
+account_id = ""
+access_token_env = "BOOKMARK_INTELLIGENCE_ACCESS_TOKEN"
+timeout_seconds = 10
+
 """
     path.write_text(content, encoding="utf-8")
 

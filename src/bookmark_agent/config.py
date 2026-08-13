@@ -75,6 +75,14 @@ class SupportConfig:
 
 
 @dataclass(frozen=True)
+class EntitlementConfig:
+    endpoint: str
+    account_id: str
+    access_token_env: str
+    timeout_seconds: int
+
+
+@dataclass(frozen=True)
 class AppConfig:
     database: DatabaseConfig
     obsidian: ObsidianConfig
@@ -86,6 +94,7 @@ class AppConfig:
     notifications: NotificationsConfig
     features: FeaturesConfig
     support: SupportConfig
+    entitlements: EntitlementConfig
 
     @property
     def ollama(self) -> SummarizerConfig:
@@ -179,5 +188,11 @@ def load_config(path: Path) -> AppConfig:
                 for key, value in raw.get("support", {}).items()
                 if isinstance(value, str) and value.strip()
             }
+        ),
+        entitlements=EntitlementConfig(
+            endpoint=str(raw.get("entitlements", {}).get("endpoint", "")).strip().rstrip("/"),
+            account_id=str(raw.get("entitlements", {}).get("account_id", "")).strip(),
+            access_token_env=str(raw.get("entitlements", {}).get("access_token_env", "")).strip(),
+            timeout_seconds=int(raw.get("entitlements", {}).get("timeout_seconds", 10)),
         ),
     )

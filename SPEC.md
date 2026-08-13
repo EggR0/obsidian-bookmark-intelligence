@@ -151,6 +151,10 @@ If YouTube subtitles are unavailable, metadata and description can still be summ
 
 API keys are read only from the environment variable named by `api_key_env`. They are not written to SQLite, logs, prompts, or Markdown.
 
+## Entitlement Contract
+
+An optional `[entitlements]` service returns `plan`, `status`, `features`, and `expires_at` for an account. `refresh-entitlement` caches only those fields in OS app data. The access token is read from `access_token_env` and is never cached. Pro commands require their corresponding feature: `bulk_analysis`, `duplicate_report`, `backup`, or `restore`. An expired or inactive response is treated as Free.
+
 ## Markdown Contract
 
 ```markdown
