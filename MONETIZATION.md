@@ -42,6 +42,7 @@ Hosted AI를 사용하는 Pro 요약만 원가 대상입니다. 로컬 Ollama와
 - 국내: Toss Payments 테스트 결제 후 운영 계약
 - `server/billing_service.py`는 주문-계정 매핑, provider 검증, 중복 이벤트 차단, 구독 entitlement 발급을 담당
 - Polar는 Standard Webhooks 서명과 timestamp를 검증하고, Toss는 `TOSS_SECRET_KEY`로 결제 API를 재조회한 뒤 각 payload를 `event_id`, `account_id`, `plan`, `status`, `expires_at`으로 정규화
+- 호스팅 AI gateway는 `POST /v1/usage/consume`으로 요약 단위 크레딧을 원자적으로 차감하고 `Idempotency-Key`로 재전송 중복 차감을 막습니다. 로컬 Ollama와 사용자가 직접 연결한 API는 이 크레딧을 사용하지 않습니다.
 - 구독 종료 후 무료 실시간 기능은 유지하고 Pro 대량 작업만 일시정지
 
 ## 후원

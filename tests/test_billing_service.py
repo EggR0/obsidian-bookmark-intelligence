@@ -85,6 +85,30 @@ class BillingServiceTests(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertEqual(order["account_id"], registered["account_id"])
 
+    def test_hosted_credit_consumption_is_idempotent(self) -> None:
+        status, registered = self.request("POST", "/v1/auth/register", {"email": "credits@example.com", "password": "a-long-test-password"})
+        self.assertEqual(status, 201)
+        account_id = registered["account_id"]
+        token = registered["access_token"]
+        webhook = {"event_id": "credit-plan-1", "account_id": account_id, "plan": "Solo", "status": "active", "expires_at": "2099-01-01T00:00:00Z"}
+        raw = json.dumps(webhook).encode("utf-8")
+        signature = hmac.new(b"test-webhook-secret", raw, hashlib.sha256).hexdigest()
+        status, _ = self.request("POST", "/v1/webhooks/polar", webhook, headers={"X-Bookmark-Intelligence-Signature": f"sha256={signature}"})
+        self.assertEqual(status, 200)
+
+        headers = {"Authorization": f"Bearer {token}"}
+        status, first = self.request("POST", "/v1/usage/consume", {"units": 3, "request_id": "summary-1"}, headers=headers)
+        self.assertEqual(status, 200)
+        self.assertFalse(first["duplicate"])
+        self.assertEqual(first["remaining"], 297)
+        status, duplicate = self.request("POST", "/v1/usage/consume", {"units": 3, "request_id": "summary-1"}, headers=headers)
+        self.assertEqual(status, 200)
+        self.assertTrue(duplicate["duplicate"])
+        self.assertEqual(duplicate["remaining"], 297)
+        status, insufficient = self.request("POST", "/v1/usage/consume", {"units": 400, "request_id": "summary-too-large"}, headers=headers)
+        self.assertEqual(status, 402)
+        self.assertFalse(insufficient["ok"])
+
     def test_standard_webhook_signature(self) -> None:
         secret = base64.b64encode(b"polar-secret").decode("ascii")
         body = b'{"type":"subscription.active"}'

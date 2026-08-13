@@ -33,6 +33,10 @@ PLAN_CREDITS = {"Free": 0, "Solo": 300, "Duo": 500, "Team": 800, "Enterprise": 0
 MAX_REQUEST_BYTES = 1_048_576
 
 
+class InsufficientCreditsError(ValueError):
+    pass
+
+
 def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -133,6 +137,14 @@ class BillingService:
                   account_id TEXT NOT NULL,
                   plan TEXT NOT NULL,
                   created_at TEXT NOT NULL,
+                  FOREIGN KEY(account_id) REFERENCES accounts(account_id)
+                );
+                CREATE TABLE IF NOT EXISTS usage_events (
+                  account_id TEXT NOT NULL,
+                  request_id TEXT NOT NULL,
+                  units INTEGER NOT NULL,
+                  created_at TEXT NOT NULL,
+                  PRIMARY KEY(account_id, request_id),
                   FOREIGN KEY(account_id) REFERENCES accounts(account_id)
                 );
                 """
@@ -246,6 +258,47 @@ class BillingService:
             "hosted_credits": row["hosted_credits"],
             "expires_at": row["expires_at"],
         }
+
+    def consume_hosted_credits(self, token: str | None, request_id: str, units: int) -> dict:
+        account_id = self._account_for_token(token)
+        if not account_id:
+            raise PermissionError("Invalid access token")
+        request_id = request_id.strip()
+        if not request_id or len(request_id) > 200:
+            raise ValueError("A request_id is required and must be at most 200 characters")
+        if units <= 0 or units > 10_000:
+            raise ValueError("units must be between 1 and 10000")
+        with self._db() as connection:
+            existing = connection.execute(
+                "SELECT units FROM usage_events WHERE account_id = ? AND request_id = ?",
+                (account_id, request_id),
+            ).fetchone()
+            row = connection.execute(
+                "SELECT plan, status, expires_at, hosted_credits FROM subscriptions WHERE account_id = ?",
+                (account_id,),
+            ).fetchone()
+            if existing:
+                return {
+                    "ok": True,
+                    "duplicate": True,
+                    "account_id": account_id,
+                    "consumed": existing["units"],
+                    "remaining": row["hosted_credits"] if row else 0,
+                }
+            if not row or not _active(row["status"], row["expires_at"]) or row["plan"] == "Free":
+                raise PermissionError("An active paid plan is required for hosted credits")
+            if int(row["hosted_credits"]) < units:
+                raise InsufficientCreditsError("Not enough hosted credits")
+            remaining = int(row["hosted_credits"]) - units
+            connection.execute(
+                "UPDATE subscriptions SET hosted_credits = ?, updated_at = ? WHERE account_id = ?",
+                (remaining, utc_now(), account_id),
+            )
+            connection.execute(
+                "INSERT INTO usage_events (account_id, request_id, units, created_at) VALUES (?, ?, ?, ?)",
+                (account_id, request_id, units, utc_now()),
+            )
+        return {"ok": True, "duplicate": False, "account_id": account_id, "consumed": units, "remaining": remaining}
 
     def apply_webhook(self, provider: str, payload: dict, signature: str | None, raw_body: bytes) -> dict:
         if not self.webhook_secret:
@@ -391,6 +444,11 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
                 result = self.service.create_payment_order(self._bearer(), str(payload.get("order_id", "")), str(payload.get("plan", "")))
                 self._write(HTTPStatus.CREATED, result)
                 return
+            if self.path == "/v1/usage/consume":
+                request_id = str(payload.get("request_id") or self.headers.get("Idempotency-Key", ""))
+                result = self.service.consume_hosted_credits(self._bearer(), request_id, int(payload.get("units", 0)))
+                self._write(HTTPStatus.OK, result)
+                return
             if self.path == "/v1/webhooks/polar":
                 result = self.service.apply_polar_webhook(payload, raw_body, {key.lower(): value for key, value in self.headers.items()})
                 self._write(HTTPStatus.OK, result)
@@ -411,6 +469,8 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
             self._write(HTTPStatus.NOT_FOUND, {"ok": False, "error": "Not found"})
         except PermissionError as error:
             self._write(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": str(error)})
+        except InsufficientCreditsError as error:
+            self._write(HTTPStatus.PAYMENT_REQUIRED, {"ok": False, "error": str(error)})
         except (ValueError, json.JSONDecodeError) as error:
             self._write(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(error)})
         except Exception as error:

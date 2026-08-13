@@ -34,6 +34,14 @@ Payment flow:
 2. Polar events are accepted at `POST /v1/webhooks/polar` only after Standard Webhooks signature and timestamp verification. The Polar payload must carry `account_id` and `plan` in its metadata; the adapter normalizes subscription state.
 3. Toss `PAYMENT_STATUS_CHANGED` events are accepted at `POST /v1/webhooks/toss` only when the order is known and the server re-queries Toss with `TOSS_SECRET_KEY`. A raw Toss webhook is never treated as proof of payment.
 
+Hosted AI gateways can reserve usage with `POST /v1/usage/consume` using the user's bearer token and either a JSON `request_id` or `Idempotency-Key` header:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8787/v1/usage/consume -Method Post -Headers @{Authorization="Bearer <token>";"Idempotency-Key"="summary-123"} -ContentType application/json -Body (@{units=1} | ConvertTo-Json)
+```
+
+The operation requires an active paid plan, decrements `hosted_credits` atomically, and returns HTTP 402 when the balance is insufficient. Repeating the same request key does not charge twice. Local Ollama and user-owned provider API keys do not use this endpoint.
+
 The generic HMAC endpoint remains available at other `/v1/webhooks/<provider>` paths for already-verified self-hosted adapters and local tests. It is not a substitute for provider-specific verification.
 
 The service applies a small per-process, per-IP rate limit to API, authentication, entitlement, and webhook requests and rejects JSON bodies larger than 1 MiB. A public deployment still needs an HTTPS reverse proxy, distributed rate limiting, a managed database backup, email verification, password reset, and a secrets manager. The included service is a reference implementation, not a complete hosted payment product.
