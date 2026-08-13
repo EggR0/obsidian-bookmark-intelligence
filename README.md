@@ -536,6 +536,22 @@ processed_at: "2026-08-11T03:30:00Z"
 
 ## 설치
 
+### 업데이트
+
+Git checkout으로 설치한 사용자는 기존 `config.toml`과 Vault를 유지한 채 다음 명령으로 최신 코드를 받고 다시 빌드할 수 있습니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1 -VaultPath D:\obsidian -SkipOpen
+```
+
+Linux/macOS:
+
+```bash
+SKIP_OPEN=1 ./scripts/update.sh
+```
+
+태그가 GitHub Release로 배포되면 Release에는 Chrome ZIP, Firefox XPI, Windows Native Host, 소스 번들이 함께 올라갑니다. 브라우저 스토어 자동 업데이트는 각 스토어 심사와 게시가 완료된 뒤 스토어 정책에 따라 동작합니다.
+
 ### 빠른 설치
 
 Windows에서는 `install.ps1`로 대부분의 설치 과정을 한 번에 실행할 수 있습니다.
