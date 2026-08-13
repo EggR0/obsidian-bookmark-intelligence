@@ -13,7 +13,8 @@
     "bookmarks",
     "nativeMessaging",
     "notifications",
-    "storage"
+    "storage",
+    "downloads"
   ],
   "action": {
     "default_title": "Bookmark Intelligence",

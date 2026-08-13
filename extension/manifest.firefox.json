@@ -8,7 +8,7 @@
     "48": "icon48.png",
     "128": "icon128.png"
   },
-  "permissions": ["alarms", "bookmarks", "nativeMessaging", "notifications", "storage"],
+  "permissions": ["alarms", "bookmarks", "nativeMessaging", "notifications", "storage", "downloads"],
   "action": {
     "default_title": "Bookmark Intelligence",
     "default_icon": {

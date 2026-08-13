@@ -9,7 +9,7 @@ This project can produce Chrome Web Store and Firefox Add-ons packages, but the 
 - Extension options page: `options.html`
 - Browser notifications: `notifications` and `alarms`
 - Native Messaging permission and local agent bridge
-- Local agent download button pointing to GitHub Releases
+- Local agent download button for the latest GitHub Release Windows bundle
 - Store-safe local-first design: no advertising and no daily quota in the local/Ollama path
 
 ## What Still Requires Store Accounts
@@ -32,7 +32,7 @@ Firefox Add-ons:
 
 ## Important Native Messaging Note
 
-The browser extension cannot silently install or run the local Python/native agent from a web store listing. Users must install the local agent separately. This extension provides a `Get local agent` button that opens the GitHub Releases page where the local installer and packages are available.
+The browser extension cannot silently install or run the local Python/native agent from a web store listing. Users must install the local agent separately. This extension provides a `Get local agent` button that downloads the latest Windows bundle; the user then runs `install.ps1` once.
 
 ## Hardware Requirements Disclosure
 
@@ -100,6 +100,7 @@ Permissions explanation:
 bookmarks: read bookmark changes and existing bookmark trees.
 nativeMessaging: communicate with the locally installed Bookmark Intelligence agent.
 storage: store extension profile id, settings, and last notification cursor.
+downloads: download the user-requested local agent installation bundle.
 notifications: show browser notifications for queued/completed/failed work.
 alarms: poll local activity status while the browser is running.
 ```
@@ -127,7 +128,7 @@ Use of bookmark data is limited to providing the user-facing bookmark-to-Obsidia
 Remote code:
 
 ```text
-The extension package does not load remote code. The Get local agent button opens the project's GitHub Releases page so the user can download the separately installed local agent.
+The extension package does not load remote code. The Get local agent button downloads a user-requested static installation archive from the project's GitHub Releases asset URL.
 ```
 
 ## Firefox Add-ons Data Disclosure Draft

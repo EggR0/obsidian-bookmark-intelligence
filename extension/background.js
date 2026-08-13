@@ -4,7 +4,7 @@ const api = globalThis.browser || globalThis.chrome;
 const isPromiseApi = Boolean(globalThis.browser);
 const storageArea = api.storage && api.storage.local;
 const ACTIVITY_ALARM = "bookmark-agent-activity-poll";
-const DEFAULT_AGENT_DOWNLOAD_URL = "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest";
+const DEFAULT_AGENT_DOWNLOAD_URL = "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest/download/bookmark-intelligence-windows.zip";
 const DEFAULT_SETTINGS = {
   agentDownloadUrl: DEFAULT_AGENT_DOWNLOAD_URL,
   notificationsEnabled: true,
@@ -372,6 +372,44 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse(status);
     });
 
+  return true;
+});
+
+function downloadAgentPackage(url) {
+  if (!api.downloads || !api.downloads.download) {
+    return Promise.reject(new Error("This browser does not expose the downloads API."));
+  }
+  const options = {
+    url,
+    filename: "bookmark-intelligence-windows.zip",
+    saveAs: true
+  };
+  if (isPromiseApi) {
+    return api.downloads.download(options);
+  }
+  return new Promise((resolve, reject) => {
+    api.downloads.download(options, (downloadId) => {
+      const lastError = api.runtime.lastError;
+      if (lastError) {
+        reject(new Error(lastError.message));
+        return;
+      }
+      resolve(downloadId);
+    });
+  });
+}
+
+api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "download-agent") {
+    return false;
+  }
+  getSettings()
+    .then((settings) => downloadAgentPackage(settings.agentDownloadUrl || DEFAULT_AGENT_DOWNLOAD_URL))
+    .then((downloadId) => {
+      showNotification("Bookmark Intelligence", "Local agent package download started.");
+      sendResponse({ ok: true, downloadId });
+    })
+    .catch((error) => sendResponse({ ok: false, error: String(error && error.message ? error.message : error) }));
   return true;
 });
 

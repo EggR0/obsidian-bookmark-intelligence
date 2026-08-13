@@ -82,10 +82,11 @@ async function testConnection() {
 testButton.addEventListener("click", testConnection);
 
 async function openAgentDownload() {
-  const data = await getStorage(["settings"]);
-  const settings = data.settings || {};
-  const url = settings.agentDownloadUrl || "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest";
-  window.open(url, "_blank", "noopener,noreferrer");
+  const response = await sendMessage({ type: "download-agent" });
+  if (!response || !response.ok) {
+    throw new Error((response && response.error) || "Could not start local agent download");
+  }
+  detail.textContent = "Local agent package download started. Run install.ps1 after it finishes.";
 }
 
 downloadAgentButton.addEventListener("click", () => {

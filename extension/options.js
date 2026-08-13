@@ -173,8 +173,16 @@ async function saveSummaryPrompt() {
 }
 
 openDownloadButton.addEventListener("click", () => {
-  const url = agentDownloadUrl.value.trim() || "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest";
-  window.open(url, "_blank", "noopener,noreferrer");
+  sendMessage({ type: "download-agent" })
+    .then((response) => {
+      if (!response || !response.ok) {
+        throw new Error((response && response.error) || "Could not start local agent download");
+      }
+      statusText.textContent = "Local agent package download started.";
+    })
+    .catch((error) => {
+      statusText.textContent = String(error && error.message ? error.message : error);
+    });
 });
 
 testNativeButton.addEventListener("click", () => {

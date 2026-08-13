@@ -112,7 +112,7 @@ outputs\chrome-extension.zip
 outputs\firefox-extension.xpi
 ```
 
-확장 프로그램 자체는 스토어에서 설치할 수 있게 만들 수 있지만, 로컬 agent/server는 브라우저 스토어가 자동 설치해주지 않습니다. 그래서 확장 프로그램의 `Get local agent` 버튼은 GitHub Releases 페이지를 열어 사용자가 로컬 agent를 받을 수 있게 합니다.
+확장 프로그램 자체는 스토어에서 설치할 수 있게 만들 수 있지만, 로컬 agent/server는 브라우저 스토어가 자동 설치해주지 않습니다. `Get local agent` 버튼은 최신 GitHub Release Windows 번들을 직접 다운로드하며, 사용자는 ZIP 안의 `install.ps1`을 한 번 실행해야 합니다.
 
 스토어 제출 체크리스트와 listing 문안은 `STORE_SUBMISSION.md`에 정리되어 있습니다.
 
@@ -543,14 +543,6 @@ processed_at: "2026-08-11T03:30:00Z"
 - 중요한 포인트 2
 - 중요한 포인트 3
 
-## Recommendation
-
-- Suggested folder: AI/Reading
-- Suggested tags: bookmark, ai
-
-## Source
-
-- Original: https://example.com/article
 ```
 
 ## 설치
@@ -656,6 +648,8 @@ bookmark-agent --config .\config.toml init-db
 ```
 
 `config.toml`은 개인 경로가 들어가는 파일이라 GitHub에는 올리지 않습니다. 공유용 기본값은 `config.example.toml`에 둡니다.
+
+확장 프로그램 팝업의 `Get local agent` 버튼은 최신 Windows 설치 번들을 직접 다운로드합니다. ZIP을 푼 뒤 `install.ps1`을 실행하면 의존성 설치, Native Host 등록, worker 시작까지 진행됩니다. 브라우저 확장 프로그램은 운영체제 실행 파일을 자동 실행할 수 없으므로 이 설치 스크립트 실행은 한 번 필요합니다.
 
 ### 4. 확장 프로그램 빌드
 
