@@ -18,10 +18,6 @@ Return Korean Markdown with these sections:
 ## Key Points
 - 3-7 bullets.
 
-## Recommendation
-- Suggested folder: one short path
-- Suggested tags: 3-8 lowercase tags
-
 Title: {{title}}
 URL: {{url}}
 
