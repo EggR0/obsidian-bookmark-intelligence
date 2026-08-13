@@ -4,8 +4,11 @@ from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from bookmark_agent.config import load_config
+from bookmark_agent.bookmark_import import ImportFilters, find_duplicate_groups
+from bookmark_agent.browser_scan import ScannedBookmark
 from bookmark_agent.database import connect, init_db
 from bookmark_agent.markdown import write_obsidian_note
 from bookmark_agent.service import ingest_bookmark_event
@@ -88,6 +91,19 @@ class BookmarkLifecycleTests(unittest.TestCase):
             content = note.read_text(encoding="utf-8")
             self.assertIn('source_url: "https://example.com/article?x=1&y=2"', content)
             self.assertIn('# A "quoted" title with a line break', content)
+
+    def test_duplicate_report_groups_canonical_urls_without_deleting(self) -> None:
+        bookmarks = [
+            ScannedBookmark("chrome-scan", "Default", "1", "One", "https://example.com/a?utm_source=x", folder="A"),
+            ScannedBookmark("firefox-scan", "work", "2", "Two", "https://example.com/a", folder="B"),
+            ScannedBookmark("chrome-scan", "Default", "3", "Three", "https://other.example/a", folder="C"),
+        ]
+        with patch("bookmark_agent.bookmark_import.collect_bookmarks", return_value=bookmarks):
+            groups = find_duplicate_groups(ImportFilters())
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0]["canonical_url"], "https://example.com/a")
+        self.assertEqual(groups[0]["count"], 2)
+        self.assertEqual(groups[0]["bookmarks"][1]["profile"], "work")
 
 
 if __name__ == "__main__":

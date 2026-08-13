@@ -4,7 +4,7 @@
 
 Bookmark Intelligence detects Chrome and Firefox bookmark changes, deduplicates canonical URLs, extracts compact webpage or YouTube source data, summarizes it with a configured AI provider, and writes one concise Markdown note per URL into the configured Obsidian Vault.
 
-The free core is real-time bookmark processing. Existing-bookmark bulk analysis and app-state backup/restore are Pro capabilities. The local Ollama and user-owned API-key paths do not impose an application daily quota.
+The free core is real-time bookmark processing. Existing-bookmark bulk analysis, advanced duplicate reports, and app-state backup/restore are Pro capabilities. The local Ollama and user-owned API-key paths do not impose an application daily quota.
 
 ## Non-Goals
 
@@ -175,6 +175,8 @@ The default is browser notifications, not Windows desktop notifications. The ext
 ## Pro Backup Contract
 
 `backup --output file.zip` creates a versioned ZIP containing `manifest.json`, a SQLite snapshot, and approved app-state files. It never archives the configured Vault directory. `restore --input file.zip` validates the format and Vault identity before replacing the local SQLite snapshot and approved state files. The worker should be stopped during restore.
+
+`duplicate-report` groups bookmarks by canonical URL and returns the browser/profile/folder locations. It is read-only and never deletes or moves bookmarks.
 
 ## Security Model
 

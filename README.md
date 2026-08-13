@@ -122,6 +122,14 @@ outputs\firefox-extension.xpi
 
 기존 북마크 대량 분석은 Pro 기능입니다. Pro가 활성화된 설치에서는 SQLite 큐에 작업을 넣고, 중단 후에도 재시도 가능한 방식으로 순차 처리합니다.
 
+고급 중복 정리는 자동 삭제가 아니라 여러 브라우저 프로필의 같은 canonical URL을 그룹으로 보여주는 Pro 보고서입니다.
+
+```powershell
+bookmark-agent --config .\config.toml duplicate-report --domain github.com
+```
+
+보고서에는 브라우저, 프로필, 북마크 ID, 제목, 폴더가 포함됩니다. 사용자가 확인한 뒤 브라우저에서 삭제해야 하며, 프로그램은 북마크를 임의로 삭제하거나 이동하지 않습니다.
+
 대량 분석은 다음 명령으로 시작합니다.
 
 ```text

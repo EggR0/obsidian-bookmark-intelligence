@@ -7,7 +7,7 @@ import sys
 
 from .activity import record_activity
 from .backup import backup_state, restore_state
-from .bookmark_import import ImportFilters, import_bookmarks
+from .bookmark_import import ImportFilters, find_duplicate_groups, import_bookmarks
 from .browser_scan import scan_browser_bookmarks
 from .config import load_config
 from .database import init_db
@@ -63,6 +63,13 @@ def build_parser() -> argparse.ArgumentParser:
     backup_parser.add_argument("--output", required=True, help="Destination .zip path")
     restore_parser = subparsers.add_parser("restore", help="Restore a Pro app-state backup")
     restore_parser.add_argument("--input", required=True, help="Backup .zip path")
+    duplicate_parser = subparsers.add_parser("duplicate-report", help="Create a Pro duplicate bookmark report")
+    duplicate_parser.add_argument("--browser", choices=["chrome", "firefox"], help="Filter scanned browser source")
+    duplicate_parser.add_argument("--profile", help="Filter profile name substring")
+    duplicate_parser.add_argument("--folder", help="Filter folder path/title substring")
+    duplicate_parser.add_argument("--domain", help="Filter domain substring")
+    duplicate_parser.add_argument("--url-contains", help="Filter URL substring")
+    duplicate_parser.add_argument("--type", choices=["webpage", "youtube"], dest="resource_type")
     subparsers.add_parser("open-extension-setup", help="Open browser extension pages and outputs folder")
     scan = subparsers.add_parser("scan-bookmarks", help="Scan local Chrome/Firefox bookmark stores once")
     scan.add_argument("--dry-run", action="store_true", help="Count changes without enqueueing events")
@@ -128,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
 
     config = load_config(config_path)
 
-    if args.command in {"backup", "restore"} and not config.features.pro_enabled:
+    if args.command in {"backup", "restore", "duplicate-report"} and not config.features.pro_enabled:
         raise SystemExit(f"{args.command} is a Pro feature. Use the subscription-enabled desktop app.")
 
     if args.command == "backup":
@@ -139,6 +146,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "restore":
         init_db(config.database.path)
         print(json.dumps(restore_state(config, Path(args.input)), ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "duplicate-report":
+        filters = ImportFilters(
+            browser=args.browser,
+            profile=args.profile,
+            folder=args.folder,
+            domain=args.domain,
+            url_contains=args.url_contains,
+            resource_type=args.resource_type,
+        )
+        print(json.dumps({"ok": True, "groups": find_duplicate_groups(filters)}, ensure_ascii=False, indent=2))
         return 0
 
     if args.command == "init-db":

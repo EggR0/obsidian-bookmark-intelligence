@@ -92,6 +92,45 @@ def prepare_import_items(filters: ImportFilters) -> tuple[list[ImportItem], dict
     }
 
 
+def find_duplicate_groups(filters: ImportFilters) -> list[dict]:
+    groups: dict[str, list[ScannedBookmark]] = {}
+    for bookmark in collect_bookmarks():
+        if not bookmark.url.startswith(("http://", "https://")):
+            continue
+        canonical_url = canonicalize_url(bookmark.url)
+        item = ImportItem(
+            bookmark=bookmark,
+            canonical_url=canonical_url,
+            resource_type=resource_type_for_url(canonical_url),
+            domain=_domain_for(canonical_url),
+        )
+        if _matches_filter(item, filters):
+            groups.setdefault(canonical_url, []).append(bookmark)
+
+    duplicates = []
+    for canonical_url, bookmarks in groups.items():
+        if len(bookmarks) < 2:
+            continue
+        duplicates.append(
+            {
+                "canonical_url": canonical_url,
+                "count": len(bookmarks),
+                "bookmarks": [
+                    {
+                        "browser": bookmark.browser,
+                        "profile": bookmark.profile,
+                        "bookmark_id": bookmark.bookmark_id,
+                        "title": bookmark.title,
+                        "url": bookmark.url,
+                        "folder": bookmark.folder,
+                    }
+                    for bookmark in bookmarks
+                ],
+            }
+        )
+    return sorted(duplicates, key=lambda group: (-group["count"], group["canonical_url"]))
+
+
 def enqueue_summaries(config: AppConfig, items: list[ImportItem], stats: dict, dry_run: bool = False) -> dict:
     if dry_run:
         return {"ok": True, "mode": "summarize", "dry_run": True, **stats}
