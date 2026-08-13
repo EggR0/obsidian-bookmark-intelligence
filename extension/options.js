@@ -33,6 +33,7 @@ const savePromptButton = document.getElementById("save-prompt-button");
 const resetPromptButton = document.getElementById("reset-prompt-button");
 const saveAiButton = document.getElementById("save-ai-button");
 const saveEntitlementButton = document.getElementById("save-entitlement-button");
+const purchaseButton = document.getElementById("purchase-button");
 const previewExistingButton = document.getElementById("preview-existing-button");
 const importExistingButton = document.getElementById("import-existing-button");
 
@@ -65,6 +66,12 @@ function renderSettings(payload) {
   activityPollingEnabled.checked = Boolean(settings.activityPollingEnabled);
   pollInterval.value = String(settings.pollIntervalMinutes || 1);
   profileId.textContent = payload.profileId || "Unknown";
+  for (const option of aiProviderSelect.options) {
+    option.disabled = option.value !== "ollama";
+  }
+  saveEntitlementButton.disabled = true;
+  purchaseButton.disabled = true;
+  importExistingButton.disabled = true;
 }
 
 function renderSupportLinks(links) {
@@ -194,6 +201,9 @@ async function saveAiSettings() {
   saveAiButton.disabled = true;
   statusText.textContent = "Saving AI connection...";
   try {
+    if (aiProviderSelect.value !== "ollama") {
+      throw new Error("External AI API connections are not implemented yet. Use local Ollama.");
+    }
     const response = await sendMessage({
       type: "save-agent-settings",
       provider: aiProviderSelect.value,

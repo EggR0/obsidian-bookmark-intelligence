@@ -56,6 +56,7 @@ class StatusView extends ItemView {
     container.empty();
     container.createEl("h2", { text: "Bookmark Intelligence" });
     container.createEl("p", { text: `Activity: ${stateDirectory(this.plugin)}` });
+    container.createEl("p", { text: "Paid plans and external AI API connections are not implemented yet. Local Ollama and the local agent are available." });
     const actions = container.createDiv({ cls: "bookmark-intelligence-actions" });
     const refreshButton = actions.createEl("button", { text: "Refresh" });
     refreshButton.addEventListener("click", () => this.refresh());
@@ -89,6 +90,7 @@ class BookmarkIntelligenceSettings extends PluginSettingTab {
     containerEl.createEl("h2", { text: "Bookmark Intelligence" });
     containerEl.createEl("p", { text: "The Obsidian plugin is a local status and control surface. Chrome/Firefox capture still requires the browser extension and Native Messaging agent." });
     containerEl.createEl("p", { text: "Local Ollama summarization requires hardware capable of running the selected model. Larger models may require substantial RAM and a compatible GPU." });
+    containerEl.createEl("p", { text: "Paid plans, hosted API credits, and external AI providers are shown for future use but are currently unavailable." });
 
     new Setting(containerEl)
       .setName("Agent command")
@@ -117,6 +119,10 @@ class BookmarkIntelligenceSettings extends PluginSettingTab {
       .setName("Open status view")
       .setDesc("Show the latest local queue and worker activity.")
       .addButton((button) => button.setButtonText("Open").onClick(() => this.plugin.activateView()));
+    new Setting(containerEl)
+      .setName("Paid plans and external APIs")
+      .setDesc("Not implemented yet. This control is intentionally disabled.")
+      .addButton((button) => button.setButtonText("Coming soon").setDisabled(true));
   }
 }
 

@@ -1,7 +1,7 @@
 {
   "id": "bookmark-intelligence",
   "name": "Obsidian Bookmark Intelligence",
-  "version": "0.2.37",
+  "version": "0.2.38",
   "minAppVersion": "1.4.0",
   "description": "Local status and control surface for the Bookmark Intelligence browser agent.",
   "author": "EggR0",
