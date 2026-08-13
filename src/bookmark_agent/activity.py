@@ -37,7 +37,21 @@ def _append_jsonl(config: AppConfig, entry: dict) -> None:
 def _print_console(entry: dict) -> None:
     message = entry.get("message") or ""
     title = entry.get("title") or entry.get("resource_title") or APP_NAME
-    print(f"[{entry['timestamp']}] {entry['event_type']}: {title} - {message}", flush=True)
+    line = f"[{entry['timestamp']}] {entry['event_type']}: {title} - {message}\n"
+    try:
+        print(line, end="", flush=True)
+    except UnicodeEncodeError:
+        # A Windows console may use cp949 while a bookmark title contains a
+        # character that encoding cannot represent. Logging must not stop the worker.
+        encoded = line.encode(getattr(sys.stdout, "encoding", None) or "utf-8", errors="replace")
+        buffer = getattr(sys.stdout, "buffer", None)
+        if buffer is not None:
+            buffer.write(encoded)
+            buffer.flush()
+        else:
+            safe_line = line.encode("ascii", errors="replace").decode("ascii")
+            sys.stdout.write(safe_line)
+            sys.stdout.flush()
 
 
 def _send_windows_notification(title: str, message: str) -> None:
