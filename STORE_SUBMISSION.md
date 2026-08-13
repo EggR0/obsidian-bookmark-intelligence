@@ -28,10 +28,12 @@ Obsidian community plugins:
 Chrome Web Store:
 
 1. Register or use a Chrome Web Store developer account.
-2. Upload `outputs/chrome-extension.zip`.
-3. Complete listing information and privacy fields.
-4. Submit for review.
-5. After approval and public visibility, users can find it through Chrome Web Store search.
+2. Enable the account's required two-step verification before publishing.
+3. Upload `outputs/chrome-extension.zip`.
+4. Complete listing information, privacy fields, and the public privacy-policy URL.
+5. Because the product offers paid features, complete any publisher address or business-information fields required by the dashboard.
+6. Submit for review.
+7. After approval and public visibility, users can find it through Chrome Web Store search.
 
 Firefox Add-ons:
 
@@ -185,6 +187,7 @@ Users can uninstall the extension, remove the Native Messaging manifest, stop th
 ## Official References
 
 - Chrome Web Store publish flow: https://developer.chrome.com/docs/webstore/publish
+- Chrome Web Store developer account setup: https://developer.chrome.com/docs/webstore/set-up-account
 - Chrome Web Store preparation: https://developer.chrome.com/docs/webstore/prepare
 - Chrome Web Store user data FAQ: https://developer.chrome.com/docs/webstore/program-policies/user-data-faq
 - Chrome Web Store program policies: https://developer.chrome.com/docs/webstore/program-policies
