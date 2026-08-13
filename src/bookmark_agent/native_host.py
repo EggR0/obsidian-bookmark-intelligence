@@ -6,6 +6,7 @@ import struct
 import sys
 
 from .bookmark_import import ImportFilters, import_bookmarks
+from . import __version__
 from .config import AppConfig, runtime_settings_path, save_runtime_settings
 from .entitlements import current_plan, has_feature
 from .service import ingest_bookmark_event
@@ -148,6 +149,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
     return {
         "ok": True,
         "command": "ping",
+        "agent_version": __version__,
         "vault_path": str(config.obsidian.vault_path),
         "database_path": str(config.database.path),
         "notes_subdir": config.obsidian.notes_subdir,

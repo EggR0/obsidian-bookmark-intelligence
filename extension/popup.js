@@ -58,7 +58,8 @@ function render(status) {
     return;
   }
 
-  detail.textContent = `Queue: ${response.database_path || "unknown"}`;
+  const version = response.agent_version ? `Agent ${response.agent_version}` : "Agent version unknown";
+  detail.textContent = `${version} | Queue: ${response.database_path || "unknown"}`;
 }
 
 async function testConnection() {
