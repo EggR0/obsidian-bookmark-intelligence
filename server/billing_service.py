@@ -11,6 +11,13 @@ from pathlib import Path
 import secrets
 import sqlite3
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
+import base64
+
+try:
+    from .provider_adapters import normalize_polar, normalize_toss, verify_standard_webhook
+except ImportError:  # pragma: no cover - supports `python server/billing_service.py`
+    from provider_adapters import normalize_polar, normalize_toss, verify_standard_webhook
 
 
 PLAN_FEATURES = {
@@ -44,9 +51,10 @@ def _active(status: str, expires_at: str | None) -> bool:
 
 
 class BillingService:
-    def __init__(self, database_path: Path, webhook_secret: str):
+    def __init__(self, database_path: Path, webhook_secret: str, toss_secret_key: str = ""):
         self.database_path = database_path
         self.webhook_secret = webhook_secret
+        self.toss_secret_key = toss_secret_key
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
@@ -98,6 +106,13 @@ class BillingService:
                   event_id TEXT NOT NULL,
                   received_at TEXT NOT NULL,
                   PRIMARY KEY(provider, event_id)
+                );
+                CREATE TABLE IF NOT EXISTS payment_orders (
+                  order_id TEXT PRIMARY KEY,
+                  account_id TEXT NOT NULL,
+                  plan TEXT NOT NULL,
+                  created_at TEXT NOT NULL,
+                  FOREIGN KEY(account_id) REFERENCES accounts(account_id)
                 );
                 """
             )
@@ -160,6 +175,40 @@ class BillingService:
             row = connection.execute("SELECT account_id FROM access_tokens WHERE token_hash = ?", (token_hash,)).fetchone()
         return row["account_id"] if row else None
 
+    def create_payment_order(self, token: str | None, order_id: str, plan: str) -> dict:
+        account_id = self._account_for_token(token)
+        if not account_id:
+            raise PermissionError("Invalid access token")
+        order_id = order_id.strip()
+        if not order_id or plan not in PLAN_FEATURES or plan == "Free":
+            raise ValueError("A non-Free plan and order_id are required")
+        with self._db() as connection:
+            connection.execute(
+                "INSERT INTO payment_orders (order_id, account_id, plan, created_at) VALUES (?, ?, ?, ?)",
+                (order_id, account_id, plan, utc_now()),
+            )
+        return {"order_id": order_id, "account_id": account_id, "plan": plan}
+
+    def _order(self, order_id: str) -> sqlite3.Row | None:
+        with self._db() as connection:
+            return connection.execute("SELECT * FROM payment_orders WHERE order_id = ?", (order_id,)).fetchone()
+
+    def _verify_toss_payment(self, payment_key: str, order_id: str, expected_status: str) -> None:
+        if not self.toss_secret_key:
+            raise PermissionError("Toss payment verification is not configured")
+        credentials = base64.b64encode(f"{self.toss_secret_key}:".encode("utf-8")).decode("ascii")
+        request = Request(
+            f"https://api.tosspayments.com/v1/payments/{payment_key}",
+            headers={"Authorization": f"Basic {credentials}"},
+        )
+        try:
+            with urlopen(request, timeout=10) as response:
+                verified = json.loads(response.read().decode("utf-8"))
+        except Exception as error:
+            raise PermissionError("Toss payment could not be verified") from error
+        if verified.get("orderId") != order_id or verified.get("status") != expected_status:
+            raise PermissionError("Toss payment verification did not match the webhook")
+
     def entitlement(self, account_id: str, token: str | None) -> dict:
         if self._account_for_token(token) != account_id:
             raise PermissionError("Invalid access token")
@@ -200,6 +249,52 @@ class BillingService:
                 return {"ok": True, "duplicate": True, "event_id": event_id}
             account = connection.execute("SELECT 1 FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
             if not account:
+                raise ValueError("Unknown account_id")
+            connection.execute(
+                "INSERT INTO subscriptions (account_id, plan, status, expires_at, hosted_credits, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(account_id) DO UPDATE SET plan=excluded.plan, status=excluded.status, expires_at=excluded.expires_at, hosted_credits=excluded.hosted_credits, updated_at=excluded.updated_at",
+                (account_id, plan, status, expires_at, credits, utc_now()),
+            )
+            connection.execute("INSERT INTO webhook_events (provider, event_id, received_at) VALUES (?, ?, ?)", (provider, event_id, utc_now()))
+        return {"ok": True, "duplicate": False, "event_id": event_id, "account_id": account_id}
+
+    def apply_polar_webhook(self, payload: dict, raw_body: bytes, headers: dict[str, str]) -> dict:
+        # Keep the normalized HMAC endpoint usable for local adapter tests and self-hosted integrations.
+        if payload.get("event_id") and payload.get("account_id"):
+            return self.apply_webhook("polar", payload, headers.get("x-bookmark-intelligence-signature"), raw_body)
+        verify_standard_webhook(self.webhook_secret, raw_body, headers)
+        normalized = normalize_polar(payload, headers.get("webhook-id"))
+        return self._apply_normalized_webhook("polar", normalized)
+
+    def apply_toss_webhook(self, payload: dict) -> dict:
+        preliminary = normalize_toss(payload)
+        order = self._order(preliminary["order_id"])
+        if not order:
+            raise ValueError("Unknown Toss order_id")
+        if not preliminary["payment_key"]:
+            raise ValueError("Toss paymentKey is required")
+        self._verify_toss_payment(preliminary["payment_key"], preliminary["order_id"], preliminary["status"])
+        normalized = normalize_toss(payload, order["account_id"], order["plan"])
+        return self._apply_normalized_webhook("toss", normalized)
+
+    def _apply_normalized_webhook(self, provider: str, payload: dict) -> dict:
+        return self._apply_subscription(provider, payload)
+
+    def _apply_subscription(self, provider: str, payload: dict) -> dict:
+        event_id = str(payload.get("event_id") or "").strip()
+        account_id = str(payload.get("account_id") or "").strip()
+        if not event_id or not account_id:
+            raise ValueError("event_id and account_id are required")
+        plan = str(payload.get("plan") or "Free")
+        status = str(payload.get("status") or "inactive")
+        expires_at = payload.get("expires_at")
+        if plan not in PLAN_FEATURES or (expires_at and _parse_expiry(expires_at) is None):
+            raise ValueError("Invalid plan or expires_at")
+        credits = int(payload.get("hosted_credits", PLAN_CREDITS[plan]))
+        with self._db() as connection:
+            existing = connection.execute("SELECT 1 FROM webhook_events WHERE provider = ? AND event_id = ?", (provider, event_id)).fetchone()
+            if existing:
+                return {"ok": True, "duplicate": True, "event_id": event_id}
+            if not connection.execute("SELECT 1 FROM accounts WHERE account_id = ?", (account_id,)).fetchone():
                 raise ValueError("Unknown account_id")
             connection.execute(
                 "INSERT INTO subscriptions (account_id, plan, status, expires_at, hosted_credits, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(account_id) DO UPDATE SET plan=excluded.plan, status=excluded.status, expires_at=excluded.expires_at, hosted_credits=excluded.hosted_credits, updated_at=excluded.updated_at",
@@ -254,6 +349,22 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
                 result = self.service.login(str(payload.get("email", "")), str(payload.get("password", "")))
                 self._write(HTTPStatus.OK, result)
                 return
+            if self.path == "/v1/orders":
+                result = self.service.create_payment_order(self._bearer(), str(payload.get("order_id", "")), str(payload.get("plan", "")))
+                self._write(HTTPStatus.CREATED, result)
+                return
+            if self.path == "/v1/webhooks/polar":
+                result = self.service.apply_polar_webhook(payload, raw_body, {key.lower(): value for key, value in self.headers.items()})
+                self._write(HTTPStatus.OK, result)
+                return
+            if self.path == "/v1/webhooks/toss":
+                if self.headers.get("X-Bookmark-Intelligence-Signature"):
+                    result = self.service.apply_webhook("toss", payload, self.headers.get("X-Bookmark-Intelligence-Signature"), raw_body)
+                    self._write(HTTPStatus.OK, result)
+                    return
+                result = self.service.apply_toss_webhook(payload)
+                self._write(HTTPStatus.OK, result)
+                return
             if self.path.startswith("/v1/webhooks/"):
                 provider = self.path.removeprefix("/v1/webhooks/").strip("/")
                 result = self.service.apply_webhook(provider, payload, self.headers.get("X-Bookmark-Intelligence-Signature"), raw_body)
@@ -271,8 +382,8 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
         return
 
 
-def create_server(host: str, port: int, database_path: Path, webhook_secret: str) -> ThreadingHTTPServer:
-    service = BillingService(database_path, webhook_secret)
+def create_server(host: str, port: int, database_path: Path, webhook_secret: str, toss_secret_key: str = "") -> ThreadingHTTPServer:
+    service = BillingService(database_path, webhook_secret, toss_secret_key)
 
     class Handler(BillingRequestHandler):
         pass
@@ -292,10 +403,11 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=int(os.environ.get("BILLING_PORT", "8787")))
     parser.add_argument("--database", type=Path, default=Path(os.environ.get("BILLING_DATABASE", "billing.sqlite3")))
     parser.add_argument("--webhook-secret", default=os.environ.get("BOOKMARK_INTELLIGENCE_WEBHOOK_SECRET", ""))
+    parser.add_argument("--toss-secret-key", default=os.environ.get("TOSS_SECRET_KEY", ""))
     args = parser.parse_args()
     if not args.webhook_secret:
         parser.error("--webhook-secret or BOOKMARK_INTELLIGENCE_WEBHOOK_SECRET is required")
-    server = create_server(args.host, args.port, args.database, args.webhook_secret)
+    server = create_server(args.host, args.port, args.database, args.webhook_secret, args.toss_secret_key)
     print(f"Billing service listening on http://{args.host}:{args.port}", flush=True)
     try:
         server.serve_forever()

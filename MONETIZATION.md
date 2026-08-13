@@ -40,8 +40,8 @@ Hosted AI를 사용하는 Pro 요약만 원가 대상입니다. 로컬 Ollama와
 
 - 해외: Polar 구독·라이선스·디지털 파일
 - 국내: Toss Payments 테스트 결제 후 운영 계약
-- `server/billing_service.py`는 서명 검증·중복 이벤트 차단·구독 entitlement 발급을 담당
-- Polar/Toss 어댑터는 각 사업자 payload를 `event_id`, `account_id`, `plan`, `status`, `expires_at`으로 정규화한 뒤 서버에 전달
+- `server/billing_service.py`는 주문-계정 매핑, provider 검증, 중복 이벤트 차단, 구독 entitlement 발급을 담당
+- Polar는 Standard Webhooks 서명과 timestamp를 검증하고, Toss는 `TOSS_SECRET_KEY`로 결제 API를 재조회한 뒤 각 payload를 `event_id`, `account_id`, `plan`, `status`, `expires_at`으로 정규화
 - 구독 종료 후 무료 실시간 기능은 유지하고 Pro 대량 작업만 일시정지
 
 ## 후원

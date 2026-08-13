@@ -10,6 +10,9 @@ import threading
 import unittest
 
 from server.billing_service import create_server
+from server.provider_adapters import verify_standard_webhook
+import base64
+import time
 
 
 class BillingServiceTests(unittest.TestCase):
@@ -69,6 +72,54 @@ class BillingServiceTests(unittest.TestCase):
         status, payload = self.request("POST", "/v1/webhooks/toss", {"event_id": "evt-1", "account_id": "unknown"}, headers={"X-Bookmark-Intelligence-Signature": "bad"})
         self.assertEqual(status, 401)
         self.assertFalse(payload["ok"])
+
+    def test_payment_order_requires_authenticated_account(self) -> None:
+        status, registered = self.request("POST", "/v1/auth/register", {"email": "orders@example.com", "password": "a-long-test-password"})
+        self.assertEqual(status, 201)
+        status, order = self.request(
+            "POST",
+            "/v1/orders",
+            {"order_id": "order-123", "plan": "Solo"},
+            headers={"Authorization": f"Bearer {registered['access_token']}"},
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(order["account_id"], registered["account_id"])
+
+    def test_standard_webhook_signature(self) -> None:
+        secret = base64.b64encode(b"polar-secret").decode("ascii")
+        body = b'{"type":"subscription.active"}'
+        webhook_id = "msg_123"
+        timestamp = str(int(time.time()))
+        signed = f"{webhook_id}.{timestamp}.".encode("utf-8") + body
+        signature = base64.b64encode(hmac.new(b"polar-secret", signed, hashlib.sha256).digest()).decode("ascii")
+        verify_standard_webhook(secret, body, {"webhook-id": webhook_id, "webhook-timestamp": timestamp, "webhook-signature": f"v1,{signature}"})
+
+    def test_polar_standard_event_updates_entitlement(self) -> None:
+        from server.billing_service import BillingService
+
+        service = BillingService(Path(self.tempdir.name) / "polar.sqlite3", base64.b64encode(b"polar-secret").decode("ascii"))
+        registered = service.register("polar@example.com", "a-long-test-password")
+        payload = {
+            "type": "subscription.active",
+            "timestamp": "2099-01-01T00:00:00Z",
+            "data": {
+                "id": "sub_123",
+                "current_period_end": "2099-12-31T00:00:00Z",
+                "metadata": {"account_id": registered["account_id"], "plan": "Solo"},
+            },
+        }
+        raw = json.dumps(payload).encode("utf-8")
+        webhook_id = "msg_polar"
+        timestamp = str(int(time.time()))
+        signed = f"{webhook_id}.{timestamp}.".encode("utf-8") + raw
+        signature = base64.b64encode(hmac.new(b"polar-secret", signed, hashlib.sha256).digest()).decode("ascii")
+        result = service.apply_polar_webhook(payload, raw, {
+            "webhook-id": webhook_id,
+            "webhook-timestamp": timestamp,
+            "webhook-signature": f"v1,{signature}",
+        })
+        self.assertFalse(result["duplicate"])
+        self.assertEqual(service.entitlement(registered["account_id"], registered["access_token"])["plan"], "Solo")
 
 
 if __name__ == "__main__":
