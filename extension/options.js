@@ -13,6 +13,10 @@ const summaryPrompt = document.getElementById("summary-prompt");
 const vaultPath = document.getElementById("vault-path");
 const aiProvider = document.getElementById("ai-provider");
 const aiModel = document.getElementById("ai-model");
+const aiProviderSelect = document.getElementById("ai-provider-select");
+const aiModelInput = document.getElementById("ai-model-input");
+const aiBaseUrlInput = document.getElementById("ai-base-url-input");
+const aiApiKeyEnvInput = document.getElementById("ai-api-key-env-input");
 const plan = document.getElementById("plan");
 const supportSection = document.getElementById("support-section");
 const supportLinks = document.getElementById("support-links");
@@ -24,6 +28,7 @@ const saveButton = document.getElementById("save-button");
 const pollButton = document.getElementById("poll-button");
 const savePromptButton = document.getElementById("save-prompt-button");
 const resetPromptButton = document.getElementById("reset-prompt-button");
+const saveAiButton = document.getElementById("save-ai-button");
 const previewExistingButton = document.getElementById("preview-existing-button");
 const importExistingButton = document.getElementById("import-existing-button");
 
@@ -152,6 +157,10 @@ async function loadAgentSettings() {
   vaultPath.textContent = response.vault_path || vaultPath.textContent;
   aiProvider.textContent = response.provider || aiProvider.textContent;
   aiModel.textContent = response.model || aiModel.textContent;
+  aiProviderSelect.value = response.provider || aiProviderSelect.value;
+  aiModelInput.value = response.model || "";
+  aiBaseUrlInput.value = response.base_url || "";
+  aiApiKeyEnvInput.value = response.api_key_env || "";
   plan.textContent = response.plan || plan.textContent;
   renderSupportLinks(response.support_links);
 }
@@ -171,6 +180,28 @@ async function saveSummaryPrompt() {
     statusText.textContent = "Summary prompt saved.";
   } finally {
     savePromptButton.disabled = false;
+  }
+}
+
+async function saveAiSettings() {
+  saveAiButton.disabled = true;
+  statusText.textContent = "Saving AI connection...";
+  try {
+    const response = await sendMessage({
+      type: "save-agent-settings",
+      provider: aiProviderSelect.value,
+      model: aiModelInput.value.trim(),
+      baseUrl: aiBaseUrlInput.value.trim(),
+      apiKeyEnv: aiApiKeyEnvInput.value.trim()
+    });
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || "Could not save AI connection");
+    }
+    aiProvider.textContent = aiProviderSelect.value;
+    aiModel.textContent = aiModelInput.value.trim();
+    statusText.textContent = "AI connection saved.";
+  } finally {
+    saveAiButton.disabled = false;
   }
 }
 
@@ -218,6 +249,12 @@ savePromptButton.addEventListener("click", () => {
 resetPromptButton.addEventListener("click", () => {
   summaryPrompt.value = defaultSummaryPrompt;
   statusText.textContent = "Default prompt restored in the editor. Save to apply.";
+});
+
+saveAiButton.addEventListener("click", () => {
+  saveAiSettings().catch((error) => {
+    statusText.textContent = String(error && error.message ? error.message : error);
+  });
 });
 
 async function importExistingBookmarks(dryRun) {

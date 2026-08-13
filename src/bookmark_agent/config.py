@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
+import json
 import os
 from pathlib import Path
+import re
 import tomllib
 
 
@@ -113,6 +115,59 @@ def default_state_dir(vault_path: Path) -> Path:
     return root / "Bookmark Intelligence" / identity
 
 
+def runtime_settings_path(vault_path: Path) -> Path:
+    return default_state_dir(vault_path) / "agent-settings.json"
+
+
+def _read_runtime_settings(vault_path: Path) -> dict[str, str]:
+    path = runtime_settings_path(vault_path)
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    settings = {key: str(value).strip() for key, value in payload.items() if isinstance(value, str)}
+    if settings.get("provider") not in {"ollama", "openai", "gemini", "anthropic", "hosted"}:
+        return {}
+    if not settings.get("model") or not settings.get("base_url", "").startswith(("http://", "https://")):
+        return {}
+    return settings
+
+
+def save_runtime_settings(vault_path: Path, settings: dict[str, str]) -> Path:
+    allowed = {"provider", "model", "base_url", "api_key_env"}
+    unknown = set(settings) - allowed
+    if unknown:
+        raise ValueError(f"Unsupported runtime settings: {', '.join(sorted(unknown))}")
+    provider = settings.get("provider", "").lower()
+    if provider not in {"ollama", "openai", "gemini", "anthropic", "hosted"}:
+        raise ValueError("Unsupported AI provider")
+    model = settings.get("model", "").strip()
+    if not model or len(model) > 200:
+        raise ValueError("AI model must be between 1 and 200 characters")
+    base_url = settings.get("base_url", "").strip().rstrip("/")
+    if not base_url.startswith(("http://", "https://")):
+        raise ValueError("AI base URL must start with http:// or https://")
+    api_key_env = settings.get("api_key_env", "").strip()
+    if api_key_env and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", api_key_env):
+        raise ValueError("API key environment variable name is invalid")
+    path = runtime_settings_path(vault_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {"provider": provider, "model": model, "base_url": base_url, "api_key_env": api_key_env},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 def load_config(path: Path) -> AppConfig:
     raw = tomllib.loads(path.read_text(encoding="utf-8-sig"))
 
@@ -144,7 +199,7 @@ def load_config(path: Path) -> AppConfig:
         "hosted": "http://127.0.0.1:8788",
     }.get(provider, "http://localhost:11434")
 
-    return AppConfig(
+    config = AppConfig(
         database=DatabaseConfig(path=db_path),
         obsidian=ObsidianConfig(
             vault_path=vault_path,
@@ -197,3 +252,17 @@ def load_config(path: Path) -> AppConfig:
             timeout_seconds=int(raw.get("entitlements", {}).get("timeout_seconds", 10)),
         ),
     )
+
+    runtime = _read_runtime_settings(vault_path)
+    if runtime:
+        config = replace(
+            config,
+            summarizer=replace(
+                config.summarizer,
+                provider=runtime.get("provider", config.summarizer.provider),
+                base_url=runtime.get("base_url", config.summarizer.base_url),
+                model=runtime.get("model", config.summarizer.model),
+                api_key_env=runtime.get("api_key_env", config.summarizer.api_key_env),
+            ),
+        )
+    return config
