@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bookmark Intelligence",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Summarize Chrome bookmarks into compact Obsidian Markdown notes with a local or user-configured AI provider.",
   "icons": {
     "16": "icon16.png",
