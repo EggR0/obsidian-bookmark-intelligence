@@ -81,7 +81,7 @@ Reference entry format:
 Use this in the plugin description, README, and submission notes:
 
 ```text
-Requires a separately installed local agent and local Ollama model. Summary speed and reliability depend on the user's CPU, RAM, GPU, and selected Ollama model. Bookmark capture and index viewing can work without a loaded model, but automatic summaries require Ollama to load and run the configured model.
+Requires a separately installed local agent and local Ollama model. Summary speed and reliability depend on the user's CPU, RAM, GPU, and selected Ollama model. Bookmark capture and activity viewing can work without a loaded model, but automatic summaries require Ollama to load and run the configured model.
 ```
 
 ## Official References
