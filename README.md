@@ -370,7 +370,7 @@ API 키는 환경 변수로만 읽으며 SQLite, 로그, Vault, Markdown에 저�
 
 ### Obsidian plugin
 
-The release includes `outputs/obsidian-bookmark-intelligence-plugin.zip`. Copy `manifest.json`, `main.js`, and `README.md` from the archive into `<vault>/.obsidian/plugins/bookmark-intelligence/`, then enable **Bookmark Intelligence** in Obsidian. The plugin is a desktop-only status and control surface: it reads the local activity log and can run the configured agent once. The browser extension and Native Messaging agent are still required for real-time bookmark capture.
+The release includes `outputs/obsidian-bookmark-intelligence-plugin.zip`. Copy `manifest.json`, `main.js`, `styles.css`, and `README.md` from the archive into `<vault>/.obsidian/plugins/bookmark-intelligence/`, then enable **Bookmark Intelligence** in Obsidian. The plugin is a desktop-only status and control surface: it reads the local activity log and can run the configured agent once. It does not create a Vault index or move notes. The browser extension and Native Messaging agent are still required for real-time bookmark capture.
 
 The plugin does not create a Vault index or move notes. Local Ollama summarization still requires hardware capable of running the selected model.
 
@@ -864,7 +864,7 @@ bookmark-agent --config .\config.toml worker
 
 Obsidian Community Plugin으로 등록되면 사용자는 Obsidian 안의 Community plugins 화면에서 `Bookmark Intelligence`를 설치할 수 있습니다.
 
-단, Obsidian 플러그인은 로컬 agent/server를 자동으로 설치하지 않습니다. 이 플러그인은 Obsidian 안에서 활동 노트와 북마크 인덱스를 열고, 로컬 agent와 브라우저 확장 프로그램 다운로드 위치를 안내하는 제어 패널입니다. 실제 북마크 감지, 본문 추출, YouTube 자막 조회, Ollama 요약, SQLite 큐 처리는 별도 로컬 agent가 담당합니다.
+단, Obsidian 플러그인은 로컬 agent/server를 자동으로 설치하지 않습니다. 이 플러그인은 Obsidian 안에서 로컬 활동 상태를 보여주고 worker를 한 번 실행할 수 있는 제어 패널입니다. Vault 인덱스나 별도 구조를 만들지 않습니다. 실제 북마크 감지, 본문 추출, YouTube 자막 조회, Ollama 요약, SQLite 큐 처리는 별도 로컬 agent가 담당합니다.
 
 로컬 요약을 쓰려면 Ollama와 선택한 모델을 실행할 수 있는 CPU/RAM/GPU 환경이 필요합니다. 낮은 사양의 컴퓨터에서는 작은 Ollama 모델을 설정하는 것이 좋습니다.
 

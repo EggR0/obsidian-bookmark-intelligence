@@ -71,7 +71,7 @@ Reference entry format:
   "id": "bookmark-intelligence",
   "name": "Obsidian Bookmark Intelligence",
   "author": "EggR0",
-  "description": "Control panel for the local-first browser bookmark intelligence agent for Obsidian.",
+  "description": "Local status and control surface for the Bookmark Intelligence browser agent.",
   "repo": "EggR0/obsidian-bookmark-intelligence"
 }
 ```
