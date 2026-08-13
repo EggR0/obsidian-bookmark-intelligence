@@ -24,6 +24,8 @@ const saveButton = document.getElementById("save-button");
 const pollButton = document.getElementById("poll-button");
 const savePromptButton = document.getElementById("save-prompt-button");
 const resetPromptButton = document.getElementById("reset-prompt-button");
+const previewExistingButton = document.getElementById("preview-existing-button");
+const importExistingButton = document.getElementById("import-existing-button");
 
 let defaultSummaryPrompt = "";
 
@@ -216,6 +218,36 @@ savePromptButton.addEventListener("click", () => {
 resetPromptButton.addEventListener("click", () => {
   summaryPrompt.value = defaultSummaryPrompt;
   statusText.textContent = "Default prompt restored in the editor. Save to apply.";
+});
+
+async function importExistingBookmarks(dryRun) {
+  const button = dryRun ? previewExistingButton : importExistingButton;
+  button.disabled = true;
+  statusText.textContent = dryRun ? "Scanning existing bookmarks..." : "Queuing existing bookmarks...";
+  try {
+    const response = await sendMessage({ type: "import-existing-bookmarks", dryRun });
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || "Could not process existing bookmarks");
+    }
+    const count = response.selected ?? response.queued ?? response.count;
+    statusText.textContent = dryRun
+      ? `Preview complete${count === undefined ? "." : `: ${count} bookmark(s) selected.`}`
+      : `Existing bookmarks queued${count === undefined ? "." : `: ${count} bookmark(s).`}`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+previewExistingButton.addEventListener("click", () => {
+  importExistingBookmarks(true).catch((error) => {
+    statusText.textContent = String(error && error.message ? error.message : error);
+  });
+});
+
+importExistingButton.addEventListener("click", () => {
+  importExistingBookmarks(false).catch((error) => {
+    statusText.textContent = String(error && error.message ? error.message : error);
+  });
 });
 
 loadSettings()

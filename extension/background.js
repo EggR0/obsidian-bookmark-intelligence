@@ -414,6 +414,25 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "import-existing-bookmarks") {
+    return false;
+  }
+  withProfileId({
+    schema_version: 1,
+    command: "import-bookmarks",
+    mode: "summarize",
+    all: true,
+    dry_run: Boolean(message.dryRun),
+    source: { browser: detectBrowser(), extension: EXTENSION_NAME },
+    event: { type: "import-bookmarks", timestamp: nowIso() }
+  })
+    .then(sendNativeRequest)
+    .then((response) => sendResponse(response || { ok: false, error: "Empty native response" }))
+    .catch((error) => sendResponse({ ok: false, error: String(error && error.message ? error.message : error) }));
+  return true;
+});
+
+api.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || message.type !== "get-extension-settings") {
     return false;
   }

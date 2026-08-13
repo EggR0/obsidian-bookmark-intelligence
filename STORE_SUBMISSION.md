@@ -93,6 +93,7 @@ The extension includes:
 - Browser notifications for queued, succeeded, and failed processing
 - Settings page for notification and local agent download settings
 - Editable local summary prompt with variables for title, URL, and source text
+- Options-page controls to preview or queue existing bookmarks for Pro bulk analysis
 
 The local agent must be installed separately from GitHub Releases. Local summarization requires Ollama and hardware capable of running the selected local model.
 ```

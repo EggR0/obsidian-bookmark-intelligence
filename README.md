@@ -148,6 +148,8 @@ bookmark-agent --config .\config.toml import-bookmarks --mode summarize --folder
 
 수천 개를 처리하는 동안 확장 프로그램 알림과 `activity.jsonl`에 큐 등록, 추출, 요약, 저장, 실패, 재시도 상태가 기록됩니다. 로컬 Ollama 또는 사용자가 직접 연결한 API는 일일 사용량 제한 없이 동작하지만, 외부 API는 해당 공급자의 요금과 한도를 따릅니다.
 
+기존 북마크 대량 분석은 확장 프로그램 설정 페이지의 `Preview existing bookmarks`로 먼저 수량을 확인한 뒤 `Analyze existing bookmarks`로 전체 큐에 넣을 수 있습니다. 이 기능은 Pro entitlement가 필요하며, 북마크를 이동하거나 삭제하지 않습니다.
+
 ### URL 정규화와 중복 제거
 
 같은 글이 여러 북마크 폴더에 들어 있거나, 추적 파라미터만 다른 URL로 저장되어 있을 수 있습니다.
