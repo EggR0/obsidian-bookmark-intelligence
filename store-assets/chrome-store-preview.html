@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bookmark Intelligence store preview</title>
+  <style>
+    :root { color-scheme: light; --ink: #18212f; --muted: #667085; --line: #d9e0ea; --blue: #2f6fed; --green: #14804a; --panel: #ffffff; --bg: #eef2f7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .chrome { height: 54px; padding: 0 42px; display: flex; align-items: center; justify-content: space-between; background: #202124; color: #f1f3f4; }
+    .chrome strong { font-size: 18px; font-weight: 600; }
+    .chrome span { color: #bdc1c6; font-size: 14px; }
+    .shell { width: 1120px; margin: 42px auto; }
+    .hero { display: grid; grid-template-columns: 152px 1fr 190px; gap: 28px; align-items: start; }
+    .icon { width: 128px; height: 128px; border-radius: 24px; box-shadow: 0 8px 18px #1e2e451f; }
+    .eyebrow { margin: 0 0 7px; color: var(--muted); font-size: 14px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.15; letter-spacing: 0; }
+    .summary { margin: 0; max-width: 650px; color: #4b5565; font-size: 18px; }
+    .install { border: 0; border-radius: 6px; padding: 13px 18px; background: var(--blue); color: white; font: inherit; font-weight: 700; }
+    .rule { height: 1px; margin: 34px 0 28px; background: var(--line); }
+    .content { display: grid; grid-template-columns: 1.4fr 0.8fr; gap: 28px; }
+    .panel { padding: 24px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+    h2 { margin: 0 0 18px; font-size: 21px; }
+    .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .flow div { min-height: 92px; padding: 14px; border: 1px solid #dfe5ee; border-radius: 6px; background: #f8fafc; }
+    .flow b { display: block; margin-bottom: 6px; font-size: 14px; }
+    .flow span { color: var(--muted); font-size: 13px; }
+    ul { margin: 0; padding-left: 20px; color: #4b5565; }
+    li + li { margin-top: 10px; }
+    .status { display: flex; align-items: center; gap: 8px; margin-top: 20px; color: var(--green); font-weight: 650; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+  </style>
+</head>
+<body>
+  <div class="chrome"><strong>Chrome Web Store</strong><span>Extensions / Productivity</span></div>
+  <main class="shell">
+    <section class="hero">
+      <img class="icon" src="../extension/icon128.png" alt="Bookmark Intelligence icon">
+      <div><p class="eyebrow">Bookmark Intelligence</p><h1>Useful Obsidian notes from your bookmarks.</h1><p class="summary">Capture Chrome and Firefox bookmark changes, extract relevant source text, summarize it locally, and write compact Markdown into your Obsidian Vault.</p><div class="status"><span class="dot"></span>Local-first processing</div></div>
+      <button class="install">Add to Chrome</button>
+    </section>
+    <div class="rule"></div>
+    <section class="content">
+      <div class="panel"><h2>How it works</h2><div class="flow"><div><b>1. Bookmark</b><span>Save a page normally.</span></div><div><b>2. Extract</b><span>Keep only useful source text.</span></div><div><b>3. Summarize</b><span>Use Ollama locally.</span></div><div><b>4. Save</b><span>Write one Markdown note.</span></div></div></div>
+      <aside class="panel"><h2>Important requirements</h2><ul><li>Install the local agent separately.</li><li>Summaries require Ollama or a configured AI API.</li><li>Hardware must support the selected local model.</li><li>No advertising or app daily quota in the local path.</li></ul></aside>
+    </section>
+  </main>
+</body>
+</html>

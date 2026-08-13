@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import struct
 import tomllib
 import unittest
 
@@ -39,6 +40,17 @@ class VersionTests(unittest.TestCase):
         page = (Path(__file__).parents[1] / "site" / "index.html").read_text(encoding="utf-8")
         self.assertIn("unsigned submission package", page)
         self.assertIn("about:debugging", page)
+
+    def test_store_graphics_have_required_dimensions(self) -> None:
+        root = Path(__file__).parents[1] / "store-assets"
+        for name, expected in {
+            "bookmark-intelligence-store-1280x800.png": (1280, 800),
+            "bookmark-intelligence-promo-440x280.png": (440, 280),
+        }.items():
+            data = (root / name).read_bytes()
+            self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+            width, height = struct.unpack(">II", data[16:24])
+            self.assertEqual((width, height), expected)
 
 
 if __name__ == "__main__":

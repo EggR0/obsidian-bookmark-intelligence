@@ -15,6 +15,11 @@ It also produces an Obsidian community-plugin package. Obsidian publication stil
 - Native Messaging permission and local agent bridge
 - Local agent download button for the latest GitHub Release bundle selected for the user's desktop OS
 - Store-safe local-first design: no advertising and no daily quota in the local/Ollama path
+- Chrome listing assets: `store-assets/bookmark-intelligence-store-1280x800.png` and `store-assets/bookmark-intelligence-promo-440x280.png`
+
+### Listing graphics
+
+The prepared Chrome listing assets use the shipped product terminology and contain no personal Vault data. Upload the 1280x800 image as the required screenshot and the 440x280 image as the small promotional tile. Chrome's listing form also accepts up to five screenshots; a marquee tile and video are optional for this first submission. Firefox can reuse the screenshot when completing its AMO listing.
 
 ### Firefox signing status
 
@@ -198,6 +203,8 @@ Users can uninstall the extension, remove the Native Messaging manifest, stop th
 - Chrome extension permission declaration: https://developer.chrome.com/docs/extensions/develop/concepts/declare-permissions
 - Chrome Native Messaging: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging
 - Chrome Web Store best practices: https://developer.chrome.com/docs/webstore/best-practices
+- Chrome Web Store listing graphics: https://developer.chrome.com/docs/webstore/cws-dashboard-listing
+- Chrome Web Store image dimensions: https://developer.chrome.com/docs/webstore/images
 - Firefox Add-ons submission: https://extensionworkshop.com/documentation/publish/submitting-an-add-on/
 - Firefox Add-on policies: https://extensionworkshop.com/documentation/publish/add-on-policies/
 - Firefox Native Messaging: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging
