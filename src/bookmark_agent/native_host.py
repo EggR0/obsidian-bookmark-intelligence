@@ -75,6 +75,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
             "provider": config.summarizer.provider,
             "model": config.summarizer.model,
             "plan": "Pro" if config.features.pro_enabled else "Free",
+            "support_links": config.support.links,
             "summary_prompt": read_summary_prompt(config),
             "default_summary_prompt": DEFAULT_SUMMARY_PROMPT,
             "summary_prompt_path": str(prompt_path(config)),
@@ -126,6 +127,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
         "provider": config.summarizer.provider,
         "model": config.summarizer.model,
         "plan": "Pro" if config.features.pro_enabled else "Free",
+        "support_links": config.support.links,
     }
 
 

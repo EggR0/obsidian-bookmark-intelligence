@@ -114,6 +114,19 @@ button.secondary {
   color: #263241;
 }
 
+a.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid #b9c3d1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #263241;
+  font-weight: 650;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
 button:disabled {
   cursor: progress;
   opacity: 0.7;

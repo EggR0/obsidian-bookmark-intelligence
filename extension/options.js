@@ -14,6 +14,8 @@ const vaultPath = document.getElementById("vault-path");
 const aiProvider = document.getElementById("ai-provider");
 const aiModel = document.getElementById("ai-model");
 const plan = document.getElementById("plan");
+const supportSection = document.getElementById("support-section");
+const supportLinks = document.getElementById("support-links");
 const profileId = document.getElementById("profile-id");
 const promptPath = document.getElementById("prompt-path");
 const openDownloadButton = document.getElementById("open-download-button");
@@ -52,6 +54,31 @@ function renderSettings(payload) {
   activityPollingEnabled.checked = Boolean(settings.activityPollingEnabled);
   pollInterval.value = String(settings.pollIntervalMinutes || 1);
   profileId.textContent = payload.profileId || "Unknown";
+}
+
+function renderSupportLinks(links) {
+  supportLinks.replaceChildren();
+  const labels = {
+    github: "GitHub Sponsors",
+    polar: "Polar",
+    ko_fi: "Ko-fi",
+    buy_me_a_coffee: "Buy Me a Coffee",
+    patreon: "Patreon",
+    paypal: "PayPal",
+    toss: "Toss",
+    custom: "Support"
+  };
+  Object.entries(links || {}).forEach(([key, value]) => {
+    if (!/^https?:\/\//i.test(value)) return;
+    const link = document.createElement("a");
+    link.href = value;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = labels[key] || key;
+    link.className = "button secondary";
+    supportLinks.append(link);
+  });
+  supportSection.hidden = supportLinks.childElementCount === 0;
 }
 
 function collectSettings() {
@@ -124,6 +151,7 @@ async function loadAgentSettings() {
   aiProvider.textContent = response.provider || aiProvider.textContent;
   aiModel.textContent = response.model || aiModel.textContent;
   plan.textContent = response.plan || plan.textContent;
+  renderSupportLinks(response.support_links);
 }
 
 async function saveSummaryPrompt() {

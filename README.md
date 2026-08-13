@@ -350,6 +350,22 @@ timeout_seconds = 120
 
 API 키는 환경 변수로만 읽으며 SQLite, 로그, Vault, Markdown에 저장하지 않습니다.
 
+### 후원 링크
+
+확장 프로그램 설정 페이지는 `config.toml`의 `[support]`에 실제 URL이 입력된 채널만 표시합니다. GitHub Sponsors, Polar, Ko-fi, Buy Me a Coffee, Patreon, PayPal, Toss, 사용자 지정 링크를 지원합니다. 계정이 없는 채널은 빈 값으로 두며 가짜 링크를 표시하지 않습니다.
+
+```toml
+[support]
+github = "https://github.com/sponsors/your-account"
+polar = ""
+ko_fi = ""
+buy_me_a_coffee = ""
+patreon = ""
+paypal = ""
+toss = ""
+custom = ""
+```
+
 Ollama 모델은 `/api/generate` 호출 시 Ollama가 로컬에서 로드합니다. 이미 메모리에 올라와 있으면 바로 응답하고, 아직 로드되지 않았다면 첫 요청에서 로드 시간이 걸릴 수 있습니다.
 
 GPU나 모델 로드 관련 상황은 다음처럼 처리됩니다.

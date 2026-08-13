@@ -70,6 +70,11 @@ class FeaturesConfig:
 
 
 @dataclass(frozen=True)
+class SupportConfig:
+    links: dict[str, str]
+
+
+@dataclass(frozen=True)
 class AppConfig:
     database: DatabaseConfig
     obsidian: ObsidianConfig
@@ -80,6 +85,7 @@ class AppConfig:
     browser_scan: BrowserScanConfig
     notifications: NotificationsConfig
     features: FeaturesConfig
+    support: SupportConfig
 
     @property
     def ollama(self) -> SummarizerConfig:
@@ -167,4 +173,11 @@ def load_config(path: Path) -> AppConfig:
             notify_on_failure=bool(raw.get("notifications", {}).get("notify_on_failure", True)),
         ),
         features=FeaturesConfig(pro_enabled=bool(raw.get("features", {}).get("pro_enabled", False))),
+        support=SupportConfig(
+            links={
+                key: str(value).strip()
+                for key, value in raw.get("support", {}).items()
+                if isinstance(value, str) and value.strip()
+            }
+        ),
     )

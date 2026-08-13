@@ -103,6 +103,16 @@ notify_on_failure = true
 [features]
 pro_enabled = false
 
+[support]
+github = ""
+polar = ""
+ko_fi = ""
+buy_me_a_coffee = ""
+patreon = ""
+paypal = ""
+toss = ""
+custom = ""
+
 """
     path.write_text(content, encoding="utf-8")
 
