@@ -201,4 +201,6 @@ The default is browser notifications, not Windows desktop notifications. The ext
 3. Install/load the generated Chrome or Firefox extension.
 4. Run `bookmark-agent --config .\config.toml doctor`.
 5. Start the worker, or let the installer register its user startup service.
+
+For a release ZIP installation, `scripts/update-release.ps1` or `scripts/update-release.sh` downloads the latest GitHub Release asset over HTTPS into a temporary directory and reruns the installer without replacing an existing `config.toml` or Vault notes.
 6. Create a bookmark and confirm one summary note appears under the configured notes folder.
