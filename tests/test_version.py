@@ -23,6 +23,11 @@ class VersionTests(unittest.TestCase):
             self.assertIn("hardware", manifest["description"])
             self.assertEqual(manifest["homepage_url"], "https://eggr0.github.io/obsidian-bookmark-intelligence/")
 
+    def test_firefox_id_matches_native_host_registration_constant(self) -> None:
+        root = Path(__file__).parents[1]
+        manifest = json.loads((root / "extension" / "manifest.firefox.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["browser_specific_settings"]["gecko"]["id"], "bookmark-intelligence@eggr0.github.io")
+
 
 if __name__ == "__main__":
     unittest.main()
