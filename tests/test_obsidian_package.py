@@ -24,3 +24,8 @@ class ObsidianPackageTests(unittest.TestCase):
         self.assertEqual(root_manifest["minAppVersion"], source_manifest["minAppVersion"])
         self.assertEqual((ROOT / "main.js").read_bytes(), (ROOT / "obsidian-plugin" / "main.js").read_bytes())
         self.assertEqual((ROOT / "styles.css").read_bytes(), (ROOT / "obsidian-plugin" / "styles.css").read_bytes())
+
+    def test_release_workflow_carries_official_plugin_files_into_update_bundles(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        for name in ("manifest.json", "main.js", "styles.css", "versions.json"):
+            self.assertGreaterEqual(workflow.count(name), 2, name)
