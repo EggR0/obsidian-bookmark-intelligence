@@ -10,6 +10,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import secrets
 import sqlite3
+import threading
+import time
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 import base64
@@ -28,6 +30,7 @@ PLAN_FEATURES = {
     "Enterprise": ["bulk_analysis", "duplicate_report", "backup", "restore"],
 }
 PLAN_CREDITS = {"Free": 0, "Solo": 300, "Duo": 500, "Team": 800, "Enterprise": 0}
+MAX_REQUEST_BYTES = 1_048_576
 
 
 def utc_now() -> str:
@@ -48,6 +51,24 @@ def _active(status: str, expires_at: str | None) -> bool:
         return False
     expiry = _parse_expiry(expires_at)
     return expiry is None or expiry > datetime.now(UTC)
+
+
+class RateLimiter:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._windows: dict[tuple[str, str], list[float]] = {}
+
+    def allow(self, key: str, bucket: str, limit: int, window_seconds: int = 60) -> bool:
+        now = time.monotonic()
+        identifier = (key, bucket)
+        with self._lock:
+            recent = [value for value in self._windows.get(identifier, []) if now - value < window_seconds]
+            if len(recent) >= limit:
+                self._windows[identifier] = recent
+                return False
+            recent.append(now)
+            self._windows[identifier] = recent
+            return True
 
 
 class BillingService:
@@ -306,6 +327,7 @@ class BillingService:
 
 class BillingRequestHandler(BaseHTTPRequestHandler):
     service: BillingService
+    rate_limiter: RateLimiter
 
     def _write(self, status: int, payload: dict) -> None:
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -316,8 +338,18 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def _body(self) -> tuple[dict, bytes]:
-        raw = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length > MAX_REQUEST_BYTES:
+            raise ValueError("Request body is too large")
+        raw = self.rfile.read(content_length)
         return json.loads(raw.decode("utf-8") or "{}"), raw
+
+    def _allow_request(self, bucket: str, limit: int) -> bool:
+        address = self.client_address[0] if self.client_address else "unknown"
+        if self.rate_limiter.allow(address, bucket, limit):
+            return True
+        self._write(HTTPStatus.TOO_MANY_REQUESTS, {"ok": False, "error": "Too many requests"})
+        return False
 
     def _bearer(self) -> str | None:
         value = self.headers.get("Authorization", "")
@@ -330,6 +362,8 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
             return
         prefix = "/v1/entitlements/"
         if parsed.path.startswith(prefix):
+            if not self._allow_request("entitlement", 120):
+                return
             account_id = parsed.path.removeprefix(prefix).strip("/")
             try:
                 self._write(HTTPStatus.OK, self.service.entitlement(account_id, self._bearer()))
@@ -340,6 +374,10 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         try:
+            bucket = "webhook" if self.path.startswith("/v1/webhooks/") else "auth" if self.path.startswith("/v1/auth/") else "api"
+            limit = 120 if bucket == "webhook" else 20 if bucket == "auth" else 60
+            if not self._allow_request(bucket, limit):
+                return
             payload, raw_body = self._body()
             if self.path == "/v1/auth/register":
                 result = self.service.register(str(payload.get("email", "")), str(payload.get("password", "")))
@@ -389,6 +427,7 @@ def create_server(host: str, port: int, database_path: Path, webhook_secret: str
         pass
 
     Handler.service = service
+    Handler.rate_limiter = RateLimiter()
     server = ThreadingHTTPServer((host, port), Handler)
     server.billing_service = service  # type: ignore[attr-defined]
     return server

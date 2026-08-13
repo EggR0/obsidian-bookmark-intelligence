@@ -36,6 +36,6 @@ Payment flow:
 
 The generic HMAC endpoint remains available at other `/v1/webhooks/<provider>` paths for already-verified self-hosted adapters and local tests. It is not a substitute for provider-specific verification.
 
-The public deployment must use HTTPS, a managed database backup, rate limiting, email verification, password reset, and a secrets manager. The included service is a reference implementation, not a complete hosted payment product.
+The service applies a small per-process, per-IP rate limit to API, authentication, entitlement, and webhook requests and rejects JSON bodies larger than 1 MiB. A public deployment still needs an HTTPS reverse proxy, distributed rate limiting, a managed database backup, email verification, password reset, and a secrets manager. The included service is a reference implementation, not a complete hosted payment product.
 
 The service does not store Vault notes, raw webpages, transcripts, or AI API keys.

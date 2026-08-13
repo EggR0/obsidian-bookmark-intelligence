@@ -9,7 +9,7 @@ import tempfile
 import threading
 import unittest
 
-from server.billing_service import create_server
+from server.billing_service import RateLimiter, create_server
 from server.provider_adapters import verify_standard_webhook
 import base64
 import time
@@ -93,6 +93,12 @@ class BillingServiceTests(unittest.TestCase):
         signed = f"{webhook_id}.{timestamp}.".encode("utf-8") + body
         signature = base64.b64encode(hmac.new(b"polar-secret", signed, hashlib.sha256).digest()).decode("ascii")
         verify_standard_webhook(secret, body, {"webhook-id": webhook_id, "webhook-timestamp": timestamp, "webhook-signature": f"v1,{signature}"})
+
+    def test_rate_limiter_blocks_after_limit(self) -> None:
+        limiter = RateLimiter()
+        self.assertTrue(limiter.allow("127.0.0.1", "test", 2))
+        self.assertTrue(limiter.allow("127.0.0.1", "test", 2))
+        self.assertFalse(limiter.allow("127.0.0.1", "test", 2))
 
     def test_polar_standard_event_updates_entitlement(self) -> None:
         from server.billing_service import BillingService
