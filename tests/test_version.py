@@ -35,6 +35,11 @@ class VersionTests(unittest.TestCase):
         self.assertIn("detectPlatform", source)
         self.assertIn("new URL(url).pathname", source)
 
+    def test_public_install_page_discloses_unsigned_firefox_xpi(self) -> None:
+        page = (Path(__file__).parents[1] / "site" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("unsigned submission package", page)
+        self.assertIn("about:debugging", page)
+
 
 if __name__ == "__main__":
     unittest.main()
