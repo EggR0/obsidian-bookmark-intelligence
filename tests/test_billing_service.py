@@ -143,6 +143,34 @@ class BillingServiceTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(len(members["members"]), 2)
 
+    def test_team_invite_is_hashed_bound_to_member_and_audited(self) -> None:
+        status, owner = self.request("POST", "/v1/auth/register", {"email": "invite-owner@example.com", "password": "a-long-test-password"})
+        self.assertEqual(status, 201)
+        status, member = self.request("POST", "/v1/auth/register", {"email": "invite-member@example.com", "password": "a-long-test-password"})
+        self.assertEqual(status, 201)
+        webhook = {"event_id": "invite-team-plan", "account_id": owner["account_id"], "plan": "Team", "status": "active", "expires_at": "2099-01-01T00:00:00Z"}
+        raw = json.dumps(webhook).encode("utf-8")
+        signature = hmac.new(b"test-webhook-secret", raw, hashlib.sha256).hexdigest()
+        self.request("POST", "/v1/webhooks/polar", webhook, headers={"X-Bookmark-Intelligence-Signature": f"sha256={signature}"})
+        status, invite = self.request("POST", "/v1/team/invites", {"member_email": "invite-member@example.com", "ttl_hours": 24}, headers={"Authorization": f"Bearer {owner['access_token']}"})
+        self.assertEqual(status, 201)
+        self.assertTrue(invite["invite_token"])
+        connection = self.server.billing_service._connect()
+        try:
+            stored = connection.execute("SELECT token_hash FROM team_invites").fetchone()["token_hash"]
+        finally:
+            connection.close()
+        self.assertNotEqual(stored, invite["invite_token"])
+        status, accepted = self.request("POST", "/v1/team/invites/accept", {"invite_token": invite["invite_token"]}, headers={"Authorization": f"Bearer {member['access_token']}"})
+        self.assertEqual(status, 200)
+        self.assertEqual(accepted["owner_account_id"], owner["account_id"])
+        status, audit = self.request("GET", "/v1/team/audit", headers={"Authorization": f"Bearer {owner['access_token']}"})
+        self.assertEqual(status, 200)
+        self.assertEqual([event["event_type"] for event in audit["events"][:2]], ["invite_accepted", "invite_created"])
+        status, reused = self.request("POST", "/v1/team/invites/accept", {"invite_token": invite["invite_token"]}, headers={"Authorization": f"Bearer {member['access_token']}"})
+        self.assertEqual(status, 400)
+        self.assertFalse(reused["ok"])
+
     def test_standard_webhook_signature(self) -> None:
         secret = base64.b64encode(b"polar-secret").decode("ascii")
         body = b'{"type":"subscription.active"}'

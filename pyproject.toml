@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "obsidian-bookmark-intelligence"
-version = "0.2.8"
+version = "0.2.9"
 description = "Local-first Chrome/Firefox bookmark intelligence pipeline for Obsidian."
 readme = "README.md"
 requires-python = ">=3.11"

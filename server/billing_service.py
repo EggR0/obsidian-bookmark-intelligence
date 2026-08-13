@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from contextlib import contextmanager
 import hashlib
 import hmac
@@ -160,6 +160,27 @@ class BillingService:
                   FOREIGN KEY(owner_account_id) REFERENCES accounts(account_id),
                   FOREIGN KEY(member_account_id) REFERENCES accounts(account_id)
                 );
+                CREATE TABLE IF NOT EXISTS team_invites (
+                  invite_id TEXT PRIMARY KEY,
+                  owner_account_id TEXT NOT NULL,
+                  member_account_id TEXT NOT NULL,
+                  token_hash TEXT NOT NULL UNIQUE,
+                  expires_at TEXT NOT NULL,
+                  accepted_at TEXT,
+                  created_at TEXT NOT NULL,
+                  FOREIGN KEY(owner_account_id) REFERENCES accounts(account_id),
+                  FOREIGN KEY(member_account_id) REFERENCES accounts(account_id)
+                );
+                CREATE TABLE IF NOT EXISTS team_audit_events (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  owner_account_id TEXT NOT NULL,
+                  actor_account_id TEXT NOT NULL,
+                  event_type TEXT NOT NULL,
+                  member_account_id TEXT,
+                  invite_id TEXT,
+                  created_at TEXT NOT NULL,
+                  FOREIGN KEY(owner_account_id) REFERENCES accounts(account_id)
+                );
                 """
             )
 
@@ -273,7 +294,77 @@ class BillingService:
             ).rowcount
         if not deleted:
             raise ValueError("Team member was not found")
+        with self._db() as connection:
+            connection.execute(
+                "INSERT INTO team_audit_events (owner_account_id, actor_account_id, event_type, member_account_id, created_at) VALUES (?, ?, 'member_removed', ?, ?)",
+                (owner_account_id, owner_account_id, member_account_id.strip(), utc_now()),
+            )
         return {"ok": True, "owner_account_id": owner_account_id, "member_account_id": member_account_id.strip(), "removed": True}
+
+    def create_team_invite(self, token: str | None, member_email: str, ttl_hours: int = 72) -> dict:
+        owner_account_id = self._account_for_token(token)
+        if not owner_account_id:
+            raise PermissionError("Invalid access token")
+        member_email = member_email.strip().lower()
+        if "@" not in member_email or len(member_email) > 320:
+            raise ValueError("A valid member email is required")
+        ttl_hours = max(1, min(720, int(ttl_hours)))
+        invite_token = secrets.token_urlsafe(32)
+        invite_id = f"invite_{secrets.token_urlsafe(12)}"
+        token_hash = hashlib.sha256(invite_token.encode("utf-8")).hexdigest()
+        created_at = utc_now()
+        expires_at = (datetime.now(UTC) + timedelta(hours=ttl_hours)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        with self._db() as connection:
+            subscription = connection.execute("SELECT plan, status, expires_at FROM subscriptions WHERE account_id = ?", (owner_account_id,)).fetchone()
+            if not subscription or not _active(subscription["status"], subscription["expires_at"]) or subscription["plan"] not in {"Duo", "Team", "Enterprise"}:
+                raise ForbiddenError("An active Duo, Team, or Enterprise plan is required")
+            member = connection.execute("SELECT account_id FROM accounts WHERE email = ?", (member_email,)).fetchone()
+            if not member:
+                raise ValueError("The member must register an account before accepting an invite")
+            member_account_id = member["account_id"]
+            if member_account_id == owner_account_id or connection.execute("SELECT 1 FROM team_memberships WHERE member_account_id = ?", (member_account_id,)).fetchone():
+                raise ValueError("The account already belongs to a team")
+            active = connection.execute("SELECT COUNT(*) AS count FROM team_memberships WHERE owner_account_id = ?", (owner_account_id,)).fetchone()["count"]
+            pending = connection.execute("SELECT COUNT(*) AS count FROM team_invites WHERE owner_account_id = ? AND accepted_at IS NULL AND expires_at > ?", (owner_account_id, created_at)).fetchone()["count"]
+            if active + pending + 1 >= PLAN_SEATS[subscription["plan"]]:
+                raise ForbiddenError(f"The {subscription['plan']} plan has no available seats")
+            connection.execute("INSERT INTO team_invites (invite_id, owner_account_id, member_account_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)", (invite_id, owner_account_id, member_account_id, token_hash, expires_at, created_at))
+            connection.execute("INSERT INTO team_audit_events (owner_account_id, actor_account_id, event_type, member_account_id, invite_id, created_at) VALUES (?, ?, 'invite_created', ?, ?, ?)", (owner_account_id, owner_account_id, member_account_id, invite_id, created_at))
+        return {"ok": True, "invite_id": invite_id, "member_account_id": member_account_id, "expires_at": expires_at, "invite_token": invite_token}
+
+    def accept_team_invite(self, token: str | None, invite_token: str) -> dict:
+        member_account_id = self._account_for_token(token)
+        if not member_account_id:
+            raise PermissionError("Invalid access token")
+        token_hash = hashlib.sha256(invite_token.strip().encode("utf-8")).hexdigest()
+        now = utc_now()
+        with self._db() as connection:
+            invite = connection.execute("SELECT * FROM team_invites WHERE token_hash = ? AND member_account_id = ? AND accepted_at IS NULL", (token_hash, member_account_id)).fetchone()
+            if not invite:
+                raise ValueError("Invite is invalid, already accepted, or not addressed to this account")
+            if _parse_expiry(invite["expires_at"]) is None or invite["expires_at"] <= now:
+                raise ValueError("Invite has expired")
+            subscription = connection.execute("SELECT plan, status, expires_at FROM subscriptions WHERE account_id = ?", (invite["owner_account_id"],)).fetchone()
+            if not subscription or not _active(subscription["status"], subscription["expires_at"]):
+                raise ForbiddenError("The team subscription is inactive")
+            active = connection.execute("SELECT COUNT(*) AS count FROM team_memberships WHERE owner_account_id = ?", (invite["owner_account_id"],)).fetchone()["count"]
+            if active + 1 >= PLAN_SEATS[subscription["plan"]]:
+                raise ForbiddenError("The team has no available seats")
+            connection.execute("INSERT INTO team_memberships (owner_account_id, member_account_id, created_at) VALUES (?, ?, ?)", (invite["owner_account_id"], member_account_id, now))
+            connection.execute("UPDATE team_invites SET accepted_at = ? WHERE invite_id = ?", (now, invite["invite_id"]))
+            connection.execute("INSERT INTO team_audit_events (owner_account_id, actor_account_id, event_type, member_account_id, invite_id, created_at) VALUES (?, ?, 'invite_accepted', ?, ?, ?)", (invite["owner_account_id"], member_account_id, member_account_id, invite["invite_id"], now))
+        return {"ok": True, "owner_account_id": invite["owner_account_id"], "member_account_id": member_account_id, "plan": subscription["plan"]}
+
+    def team_audit(self, token: str | None) -> dict:
+        account_id = self._account_for_token(token)
+        if not account_id:
+            raise PermissionError("Invalid access token")
+        owner_account_id = self._billing_account(account_id)
+        if owner_account_id != account_id:
+            raise ForbiddenError("Only the team owner can view team audit events")
+        with self._db() as connection:
+            rows = connection.execute("SELECT event_type, actor_account_id, member_account_id, invite_id, created_at FROM team_audit_events WHERE owner_account_id = ? ORDER BY id DESC LIMIT 100", (owner_account_id,)).fetchall()
+        return {"ok": True, "owner_account_id": owner_account_id, "events": [dict(row) for row in rows]}
 
     def team_members(self, token: str | None) -> dict:
         account_id = self._account_for_token(token)
@@ -513,6 +604,14 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
             except PermissionError as error:
                 self._write(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": str(error)})
             return
+        if parsed.path == "/v1/team/audit":
+            try:
+                self._write(HTTPStatus.OK, self.service.team_audit(self._bearer()))
+            except PermissionError as error:
+                self._write(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": str(error)})
+            except ForbiddenError as error:
+                self._write(HTTPStatus.FORBIDDEN, {"ok": False, "error": str(error)})
+            return
         prefix = "/v1/entitlements/"
         if parsed.path.startswith(prefix):
             if not self._allow_request("entitlement", 120):
@@ -547,6 +646,14 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
             if self.path == "/v1/team/members":
                 result = self.service.add_team_member(self._bearer(), str(payload.get("member_account_id", "")))
                 self._write(HTTPStatus.CREATED, result)
+                return
+            if self.path == "/v1/team/invites":
+                result = self.service.create_team_invite(self._bearer(), str(payload.get("member_email", "")), int(payload.get("ttl_hours", 72)))
+                self._write(HTTPStatus.CREATED, result)
+                return
+            if self.path == "/v1/team/invites/accept":
+                result = self.service.accept_team_invite(self._bearer(), str(payload.get("invite_token", "")))
+                self._write(HTTPStatus.OK, result)
                 return
             if self.path == "/v1/team/members/remove":
                 result = self.service.remove_team_member(self._bearer(), str(payload.get("member_account_id", "")))

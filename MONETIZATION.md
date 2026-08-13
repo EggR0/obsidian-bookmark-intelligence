@@ -45,6 +45,7 @@ Hosted AI를 사용하는 Pro 요약만 원가 대상입니다. 로컬 Ollama와
 - 호스팅 AI gateway는 `POST /v1/usage/consume`으로 요약 단위 크레딧을 원자적으로 차감하고 `Idempotency-Key`로 재전송 중복 차감을 막습니다. 로컬 Ollama와 사용자가 직접 연결한 API는 이 크레딧을 사용하지 않습니다.
 - 구독 종료 후 무료 실시간 기능은 유지하고 Pro 대량 작업만 일시정지
 - Duo/Team/Enterprise는 owner가 이미 등록된 계정을 멤버로 연결해 공유 entitlement와 hosted credit을 사용합니다. 현재 reference service는 Duo 2석, Team 5석을 적용하며 이메일 초대·조직 관리 기능은 운영 배포 전에 별도 보강해야 합니다.
+- owner는 등록된 이메일 계정에 만료되는 일회성 초대 token을 발급할 수 있고, 수락·삭제는 audit feed에 남습니다. 메일 발송은 SMTP 또는 외부 transactional email provider를 운영 배포에서 연결해야 합니다.
 
 ## 후원
 

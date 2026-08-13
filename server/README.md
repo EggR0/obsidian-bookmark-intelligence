@@ -51,6 +51,16 @@ Invoke-RestMethod http://127.0.0.1:8787/v1/team/members -Headers @{Authorization
 
 Duo supports 2 total seats, Team supports 5 total seats, and Enterprise has no enforced seat cap in this reference service. A member uses their own login token, while the owner's subscription and shared credits are charged. `POST /v1/team/members/remove` removes a member. Production deployments should add email invitations, verification, audit logs, and organization administration before treating this as a complete enterprise identity system.
 
+The reference service also supports a secure invite handoff for already registered accounts. The owner creates an invite by email; the response contains the one-time token, which an external mailer or administrator can deliver to that user:
+
+```powershell
+$invite = Invoke-RestMethod http://127.0.0.1:8787/v1/team/invites -Method Post -Headers @{Authorization="Bearer <owner-token>"} -ContentType application/json -Body (@{member_email="member@example.com";ttl_hours=72} | ConvertTo-Json)
+Invoke-RestMethod http://127.0.0.1:8787/v1/team/invites/accept -Method Post -Headers @{Authorization="Bearer <member-token>"} -ContentType application/json -Body (@{invite_token=$invite.invite_token} | ConvertTo-Json)
+Invoke-RestMethod http://127.0.0.1:8787/v1/team/audit -Headers @{Authorization="Bearer <owner-token>"}
+```
+
+Only the token hash is stored, it expires, it is bound to the invited account, and it cannot be accepted twice. The included service does not send email itself. Team invite creation, acceptance, and removal are recorded in the owner-visible audit feed.
+
 Run the optional hosted gateway separately:
 
 ```powershell
