@@ -2,10 +2,13 @@
 
 This project can produce Chrome Web Store and Firefox Add-ons packages, but the final public listing requires store developer accounts, upload, review, and approval.
 
+It also produces an Obsidian community-plugin package. Obsidian publication still requires a public repository, plugin manifest review, and acceptance by the Obsidian community plugins process.
+
 ## What Is Ready
 
 - Chrome extension ZIP: `outputs/chrome-extension.zip`
 - Firefox extension XPI: `outputs/firefox-extension.xpi`
+- Obsidian plugin ZIP: `outputs/obsidian-bookmark-intelligence-plugin.zip`
 - Extension options page: `options.html`
 - Browser notifications: `notifications` and `alarms`
 - Native Messaging permission and local agent bridge
@@ -13,6 +16,12 @@ This project can produce Chrome Web Store and Firefox Add-ons packages, but the 
 - Store-safe local-first design: no advertising and no daily quota in the local/Ollama path
 
 ## What Still Requires Store Accounts
+
+Obsidian community plugins:
+
+1. Keep the plugin source in a public GitHub repository.
+2. Submit the repository through the Obsidian community plugins submission process.
+3. Complete review and wait for acceptance before claiming marketplace availability.
 
 Chrome Web Store:
 

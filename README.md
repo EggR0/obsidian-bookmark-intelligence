@@ -362,6 +362,12 @@ API 키는 환경 변수로만 읽으며 SQLite, 로그, Vault, Markdown에 저�
 
 `hosted`는 `[entitlements]`의 account ID와 bearer token을 사용해 중앙 gateway를 호출하며 성공한 요약 1건당 hosted credit 1개를 차감합니다. gateway 운영자는 upstream OpenAI-compatible API 키를 환경 변수에만 보관합니다.
 
+### Obsidian plugin
+
+The release includes `outputs/obsidian-bookmark-intelligence-plugin.zip`. Copy `manifest.json`, `main.js`, and `README.md` from the archive into `<vault>/.obsidian/plugins/bookmark-intelligence/`, then enable **Bookmark Intelligence** in Obsidian. The plugin is a desktop-only status and control surface: it reads the local activity log and can run the configured agent once. The browser extension and Native Messaging agent are still required for real-time bookmark capture.
+
+The plugin does not create a Vault index or move notes. Local Ollama summarization still requires hardware capable of running the selected model.
+
 ### Pro entitlement
 
 결제 서비스가 준비되면 `[entitlements]`에 entitlement endpoint와 account ID를 지정하고 다음 명령으로 구독 상태를 갱신합니다.
