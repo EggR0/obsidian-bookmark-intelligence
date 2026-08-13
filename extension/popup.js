@@ -7,8 +7,6 @@ const vaultPath = document.getElementById("vault-path");
 const lastCheck = document.getElementById("last-check");
 const detail = document.getElementById("detail");
 const testButton = document.getElementById("test-button");
-const previewIndexButton = document.getElementById("preview-index-button");
-const indexButton = document.getElementById("index-button");
 const downloadAgentButton = document.getElementById("download-agent-button");
 const settingsButton = document.getElementById("settings-button");
 
@@ -60,15 +58,6 @@ function render(status) {
     return;
   }
 
-  if (response.command === "import-bookmarks") {
-    const selected = Number.isInteger(response.selected) ? response.selected : 0;
-    const domains = Number.isInteger(response.domain_count) ? response.domain_count : 0;
-    detail.textContent = response.dry_run
-      ? `Preview: ${selected} bookmarks across ${domains} domains.`
-      : `Index written: ${selected} bookmarks across ${domains} domains.`;
-    return;
-  }
-
   detail.textContent = `Queue: ${response.database_path || "unknown"}`;
 }
 
@@ -91,27 +80,6 @@ async function testConnection() {
 }
 
 testButton.addEventListener("click", testConnection);
-
-async function runImportIndex(dryRun) {
-  const button = dryRun ? previewIndexButton : indexButton;
-  button.disabled = true;
-  detail.textContent = dryRun ? "Scanning existing bookmarks..." : "Creating Obsidian index...";
-  try {
-    const status = await sendMessage({ type: "import-bookmarks-index", dryRun });
-    render(status);
-  } catch (error) {
-    render({
-      ok: false,
-      checkedAt: new Date().toISOString(),
-      error: String(error && error.message ? error.message : error)
-    });
-  } finally {
-    button.disabled = false;
-  }
-}
-
-previewIndexButton.addEventListener("click", () => runImportIndex(true));
-indexButton.addEventListener("click", () => runImportIndex(false));
 
 async function openAgentDownload() {
   const data = await getStorage(["settings"]);

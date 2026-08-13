@@ -11,7 +11,8 @@ const activityPollingEnabled = document.getElementById("activity-polling-enabled
 const pollInterval = document.getElementById("poll-interval");
 const summaryPrompt = document.getElementById("summary-prompt");
 const vaultPath = document.getElementById("vault-path");
-const ollamaModel = document.getElementById("ollama-model");
+const aiProvider = document.getElementById("ai-provider");
+const aiModel = document.getElementById("ai-model");
 const profileId = document.getElementById("profile-id");
 const promptPath = document.getElementById("prompt-path");
 const openDownloadButton = document.getElementById("open-download-button");
@@ -101,7 +102,8 @@ async function testNativeHost() {
     }
     const response = status.response || {};
     vaultPath.textContent = response.vault_path || "Unknown";
-    ollamaModel.textContent = response.ollama_model || "Unknown";
+    aiProvider.textContent = response.provider || "Unknown";
+    aiModel.textContent = response.model || "Unknown";
     statusText.textContent = "Native host connected.";
   } finally {
     testNativeButton.disabled = false;
@@ -117,7 +119,8 @@ async function loadAgentSettings() {
   defaultSummaryPrompt = response.default_summary_prompt || response.summary_prompt || "";
   promptPath.textContent = response.summary_prompt_path || "Unknown";
   vaultPath.textContent = response.vault_path || vaultPath.textContent;
-  ollamaModel.textContent = response.ollama_model || ollamaModel.textContent;
+  aiProvider.textContent = response.provider || aiProvider.textContent;
+  aiModel.textContent = response.model || aiModel.textContent;
 }
 
 async function saveSummaryPrompt() {

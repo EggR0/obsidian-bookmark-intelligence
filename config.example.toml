@@ -1,13 +1,15 @@
 [database]
-path = "${vault}\\.bookmark-agent\\bookmark-agent.sqlite3"
+path = "${state}\\bookmark-agent.sqlite3"
 
 [obsidian]
 vault_path = "D:\\obsidian"
 notes_subdir = "Bookmarks"
 
-[ollama]
+[summarizer]
+provider = "ollama"
 base_url = "http://localhost:11434"
 model = "qwen2.5:7b"
+api_key_env = ""
 timeout_seconds = 120
 
 [processing]
@@ -16,23 +18,19 @@ max_retries = 3
 retry_backoff_seconds = 300
 store_extracted_text_in_sqlite = false
 
-[auto_move]
-enabled = false
-
 [browser_scan]
-enabled = false
+enabled = true
 interval_seconds = 60
 
 [notifications]
 enabled = true
 desktop = false
 activity_log = true
-activity_note = true
+activity_note = false
 print_to_console = true
 notify_on_start = false
 notify_on_success = true
 notify_on_failure = true
 
-[recommendations]
-default_folder = "Inbox/Bookmarks"
-default_tags = ["bookmark"]
+[features]
+pro_enabled = false

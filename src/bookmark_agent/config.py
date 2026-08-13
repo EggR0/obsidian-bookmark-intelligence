@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import os
 from pathlib import Path
 import tomllib
 
@@ -17,9 +19,11 @@ class ObsidianConfig:
 
 
 @dataclass(frozen=True)
-class OllamaConfig:
+class SummarizerConfig:
+    provider: str
     base_url: str
     model: str
+    api_key_env: str
     timeout_seconds: int
 
 
@@ -61,15 +65,37 @@ class NotificationsConfig:
 
 
 @dataclass(frozen=True)
+class FeaturesConfig:
+    pro_enabled: bool
+
+
+@dataclass(frozen=True)
 class AppConfig:
     database: DatabaseConfig
     obsidian: ObsidianConfig
-    ollama: OllamaConfig
+    summarizer: SummarizerConfig
     processing: ProcessingConfig
     auto_move: AutoMoveConfig
     recommendations: RecommendationConfig
     browser_scan: BrowserScanConfig
     notifications: NotificationsConfig
+    features: FeaturesConfig
+
+    @property
+    def ollama(self) -> SummarizerConfig:
+        """Compatibility alias for older extension and diagnostic code."""
+        return self.summarizer
+
+
+def default_state_dir(vault_path: Path) -> Path:
+    identity = hashlib.sha256(str(vault_path.resolve()).encode("utf-8")).hexdigest()[:16]
+    if os.name == "nt":
+        root = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    elif os.sys.platform == "darwin":
+        root = Path.home() / "Library" / "Application Support"
+    else:
+        root = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+    return root / "Bookmark Intelligence" / identity
 
 
 def load_config(path: Path) -> AppConfig:
@@ -84,11 +110,23 @@ def load_config(path: Path) -> AppConfig:
     db_path_value = database_raw.get("path")
     if db_path_value:
         db_path_text = str(db_path_value).replace("${vault}", str(vault_path))
+        db_path_text = db_path_text.replace("${state}", str(default_state_dir(vault_path)))
         db_path = Path(db_path_text)
+        if ".bookmark-agent" in db_path.parts:
+            db_path = default_state_dir(vault_path) / db_path.name
         if not db_path.is_absolute():
             db_path = base_dir / db_path
     else:
-        db_path = vault_path / ".bookmark-agent" / "bookmark-agent.sqlite3"
+        db_path = default_state_dir(vault_path) / "bookmark-agent.sqlite3"
+
+    summarizer_raw = raw.get("summarizer") or raw.get("ollama", {})
+    provider = str(summarizer_raw.get("provider", "ollama")).lower()
+    default_endpoint = {
+        "ollama": "http://localhost:11434",
+        "openai": "https://api.openai.com/v1",
+        "gemini": "https://generativelanguage.googleapis.com/v1beta",
+        "anthropic": "https://api.anthropic.com/v1",
+    }.get(provider, "http://localhost:11434")
 
     return AppConfig(
         database=DatabaseConfig(path=db_path),
@@ -96,10 +134,12 @@ def load_config(path: Path) -> AppConfig:
             vault_path=vault_path,
             notes_subdir=raw["obsidian"].get("notes_subdir", "Bookmarks"),
         ),
-        ollama=OllamaConfig(
-            base_url=raw["ollama"].get("base_url", "http://localhost:11434").rstrip("/"),
-            model=raw["ollama"].get("model", "llama3.1:8b"),
-            timeout_seconds=int(raw["ollama"].get("timeout_seconds", 120)),
+        summarizer=SummarizerConfig(
+            provider=provider,
+            base_url=str(summarizer_raw.get("base_url", default_endpoint)).rstrip("/"),
+            model=str(summarizer_raw.get("model", "qwen2.5:7b" if provider == "ollama" else "gpt-5.4-nano")),
+            api_key_env=str(summarizer_raw.get("api_key_env", "")),
+            timeout_seconds=int(summarizer_raw.get("timeout_seconds", 120)),
         ),
         processing=ProcessingConfig(
             batch_size=int(raw["processing"].get("batch_size", 5)),
@@ -107,10 +147,10 @@ def load_config(path: Path) -> AppConfig:
             retry_backoff_seconds=int(raw["processing"].get("retry_backoff_seconds", 300)),
             store_extracted_text_in_sqlite=bool(raw["processing"].get("store_extracted_text_in_sqlite", False)),
         ),
-        auto_move=AutoMoveConfig(enabled=bool(raw["auto_move"].get("enabled", False))),
+        auto_move=AutoMoveConfig(enabled=bool(raw.get("auto_move", {}).get("enabled", False))),
         recommendations=RecommendationConfig(
-            default_folder=raw["recommendations"].get("default_folder", "Inbox/Bookmarks"),
-            default_tags=list(raw["recommendations"].get("default_tags", ["bookmark"])),
+            default_folder=raw.get("recommendations", {}).get("default_folder", "Inbox/Bookmarks"),
+            default_tags=list(raw.get("recommendations", {}).get("default_tags", ["bookmark"])),
         ),
         browser_scan=BrowserScanConfig(
             enabled=bool(raw.get("browser_scan", {}).get("enabled", True)),
@@ -126,4 +166,5 @@ def load_config(path: Path) -> AppConfig:
             notify_on_success=bool(raw.get("notifications", {}).get("notify_on_success", True)),
             notify_on_failure=bool(raw.get("notifications", {}).get("notify_on_failure", True)),
         ),
+        features=FeaturesConfig(pro_enabled=bool(raw.get("features", {}).get("pro_enabled", False))),
     )

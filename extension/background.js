@@ -376,48 +376,6 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 api.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.type !== "import-bookmarks-index") {
-    return false;
-  }
-
-  withProfileId({
-    schema_version: 1,
-    command: "import-bookmarks",
-    mode: "index",
-    dry_run: Boolean(message.dryRun),
-    source: {
-      browser: detectBrowser(),
-      extension: EXTENSION_NAME
-    },
-    event: {
-      type: "import-bookmarks",
-      timestamp: nowIso()
-    }
-  })
-    .then(sendNativeRequest)
-    .then((response) => {
-      const status = {
-        ok: Boolean(response && response.ok),
-        checkedAt: nowIso(),
-        response: response || null
-      };
-      setLastStatus(status);
-      sendResponse(status);
-    })
-    .catch((error) => {
-      const status = {
-        ok: false,
-        checkedAt: nowIso(),
-        error: String(error && error.message ? error.message : error)
-      };
-      setLastStatus(status);
-      sendResponse(status);
-    });
-
-  return true;
-});
-
-api.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || message.type !== "get-extension-settings") {
     return false;
   }

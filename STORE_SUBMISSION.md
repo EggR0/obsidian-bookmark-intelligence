@@ -1,4 +1,4 @@
-# Store Submission Guide
+# Bookmark Intelligence Store Submission Guide
 
 This project can produce Chrome Web Store and Firefox Add-ons packages, but the final public listing requires store developer accounts, upload, review, and approval.
 
@@ -10,7 +10,7 @@ This project can produce Chrome Web Store and Firefox Add-ons packages, but the 
 - Browser notifications: `notifications` and `alarms`
 - Native Messaging permission and local agent bridge
 - Local agent download button pointing to GitHub Releases
-- Store-safe local-first design: no hosted summarization service, no advertising, no daily quota service
+- Store-safe local-first design: no advertising and no daily quota in the local/Ollama path
 
 ## What Still Requires Store Accounts
 
@@ -61,7 +61,7 @@ The default configuration uses qwen2.5:7b when available. Users may choose a sma
 Name:
 
 ```text
-Obsidian Bookmark Intelligence
+Bookmark Intelligence
 ```
 
 Short description:
@@ -73,15 +73,14 @@ Local-first Chrome/Firefox bookmark intelligence pipeline for Obsidian.
 Full description:
 
 ```text
-Obsidian Bookmark Intelligence captures Chrome and Firefox bookmark changes, sends them to a local Native Messaging agent, deduplicates canonical URLs, and writes compact Markdown summaries into an Obsidian vault.
+Bookmark Intelligence captures Chrome and Firefox bookmark changes, sends them to a local Native Messaging agent, deduplicates canonical URLs, and writes compact Markdown summaries into an Obsidian vault.
 
-The extension is local-first. It does not use advertising-backed bookmark services or daily quota summarization services by default. Webpage extraction is handled by the local agent with trafilatura. YouTube metadata and captions are handled with yt-dlp without downloading video files. Summaries are generated through a local Ollama model.
+The extension is local-first. It does not use advertising-backed bookmark services or daily quota summarization services in the default local path. Webpage extraction is handled by the local agent with trafilatura. YouTube metadata and captions are handled with yt-dlp without downloading video files. Summaries are generated through a local Ollama model by default, with optional user-configured AI APIs.
 
 The extension includes:
 - Real-time bookmark event capture
 - Native Host connection test
-- Existing bookmark index preview
-- Existing bookmark index creation in Obsidian
+- Optional Pro bulk analysis of existing bookmarks through the local queue
 - Browser notifications for queued, succeeded, and failed processing
 - Settings page for notification and local agent download settings
 - Editable local summary prompt with variables for title, URL, and source text
@@ -99,7 +98,7 @@ Permissions explanation:
 
 ```text
 bookmarks: read bookmark changes and existing bookmark trees.
-nativeMessaging: communicate with the locally installed Obsidian Bookmark Intelligence agent.
+nativeMessaging: communicate with the locally installed Bookmark Intelligence agent.
 storage: store extension profile id, settings, and last notification cursor.
 notifications: show browser notifications for queued/completed/failed work.
 alarms: poll local activity status while the browser is running.

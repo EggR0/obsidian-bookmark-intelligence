@@ -1,19 +1,21 @@
-# Obsidian Bookmark Intelligence
+# Bookmark Intelligence
 
 Chrome과 Firefox 북마크를 로컬에서 감지하고, 중복을 정리한 뒤, 핵심 요약만 Obsidian Markdown 노트로 남기는 로컬 우선 북마크 정리 도구입니다.
 
-광고가 붙은 북마크 서비스나 일일 사용량 제한이 있는 클라우드 요약 서비스를 기본값으로 쓰지 않습니다. 브라우저 확장 프로그램, 로컬 에이전트, SQLite 작업 큐, Ollama, Obsidian Vault를 조합합니다.
+Chrome과 Firefox에서 새 북마크를 감지하고 핵심 요약 노트를 Obsidian에 만드는 로컬 우선 도구입니다. 광고와 일일 사용량 제한 없이 Ollama 또는 사용자가 직접 연결한 AI API를 선택합니다.
+
+무료 핵심은 `새 북마크 -> 본문/자막 추출 -> 요약 -> Markdown 노트 1개`입니다. 기존 북마크 대량 분석, 고급 중복 검토, 암호화 백업과 로그인은 별도 유료 Pro 기능으로 제공합니다.
 
 ## 목표
 
 - Chrome과 Firefox에서 북마크 생성, 수정, 이동, 삭제 이벤트를 실시간 감지합니다.
 - Chrome/Firefox 공용 WebExtension 코드베이스를 사용합니다.
-- 기존 북마크 수천 개는 한 번에 색인화하고, 필요한 것만 골라 요약할 수 있습니다.
+- 기존 북마크 수천 개 분석은 Pro 기능입니다.
 - 웹페이지 본문 추출은 `trafilatura`를 재사용합니다.
 - YouTube는 `yt-dlp`로 메타데이터와 자막만 가져오며 영상 파일은 저장하지 않습니다.
 - 요약은 기본적으로 로컬 Ollama 모델을 사용합니다.
 - Obsidian에는 읽기 좋은 핵심 Markdown만 저장합니다.
-- SQLite는 Obsidian을 대체하는 DB가 아니라, 중복 방지와 재시도를 위한 내부 작업 큐로만 사용합니다.
+- SQLite는 Obsidian을 대체하는 DB가 아니라, Vault 밖 앱 데이터 폴더에서 중복 방지와 재시도를 위한 내부 작업 큐로만 사용합니다.
 - 처리 과정과 완료 결과를 Obsidian 활동 노트, JSONL 로그, 브라우저 확장 알림으로 보여줍니다.
 
 ## 현재 기본 구성
@@ -31,17 +33,10 @@ notes_subdir = "Bookmarks"
 ```text
 D:\obsidian
   Bookmarks\
-    _Index.md
-    _Inbox.md
-    by-domain\
     요약된 북마크 노트.md
-  .bookmark-agent\
-    bookmark-agent.sqlite3
-    events.jsonl
-    activity.jsonl
 ```
 
-`Bookmarks` 폴더는 사용자가 Obsidian에서 읽고 관리하는 최종 결과입니다. `Bookmarks\_Activity.md`에는 처리 단계가 누적됩니다. `.bookmark-agent` 폴더는 프로그램이 실패 재시도, 중복 제거, 처리 상태를 기억하기 위한 내부 상태입니다.
+`Bookmarks`는 요약 노트가 저장되는 출력 폴더입니다. 큐, 이벤트와 활동 로그는 Vault 밖 OS별 앱 데이터 폴더에 저장됩니다.
 
 ## 전체 작동 방식
 
@@ -51,16 +46,16 @@ Chrome / Firefox
   -> Native Messaging
   -> 로컬 Python 에이전트
   -> URL 정규화와 중복 제거
-  -> SQLite 작업 큐
+  -> 앱 데이터의 SQLite 작업 큐
   -> Worker
   -> trafilatura 또는 yt-dlp
-  -> Ollama 로컬 요약
+  -> 선택한 AI 공급자 요약
   -> Obsidian Markdown
 ```
 
 브라우저 확장 프로그램은 북마크 이벤트를 감지해서 로컬 에이전트에 전달하는 역할만 합니다. 웹페이지를 긁거나 파일을 쓰거나 요약을 만들지 않습니다.
 
-로컬 에이전트는 URL을 정규화하고 중복을 제거한 뒤, 처리할 작업을 큐에 넣습니다. Worker는 큐를 읽어 웹 본문이나 YouTube 자막을 가져오고, Ollama로 요약한 뒤, Obsidian 노트를 만듭니다.
+로컬 에이전트는 URL을 정규화하고 중복을 제거한 뒤, 처리할 작업을 큐에 넣습니다. Worker는 큐를 읽어 웹 본문이나 YouTube 자막을 가져오고, 설정된 AI 공급자로 요약한 뒤, Obsidian 노트를 만듭니다.
 
 ## 주요 기능
 
@@ -94,8 +89,7 @@ extension/
 팝업에서 할 수 있는 동작은 다음과 같습니다.
 
 - `Test connection`: Native Host와 Vault 연결 상태 확인
-- `Preview existing bookmarks`: 기존 Chrome/Firefox 북마크 수량과 도메인 수 미리보기
-- `Create Obsidian index`: PowerShell 없이 기존 북마크 색인을 Obsidian에 생성
+- 기존 북마크 대량 분석: Pro 기능으로 별도 제공
 - `Get local agent`: GitHub Releases에서 로컬 agent/server 설치 파일 받기
 - `Settings`: 확장 프로그램 설정 페이지 열기
 
@@ -124,21 +118,15 @@ outputs\firefox-extension.xpi
 
 실시간 이벤트와 별도로, 기존 Chrome/Firefox 북마크를 한 번에 가져올 수 있습니다.
 
-기본 권장 방식은 바로 전부 요약하지 않고 먼저 가벼운 색인을 만드는 것입니다.
+기존 북마크 대량 분석은 Pro 기능입니다. Pro가 활성화된 설치에서는 SQLite 큐에 작업을 넣고, 중단 후에도 재시도 가능한 방식으로 순차 처리합니다.
 
-```powershell
-bookmark-agent --config .\config.toml import-bookmarks --mode index
-```
-
-색인 모드는 다음 파일을 만듭니다.
+대량 분석은 다음 명령으로 시작합니다.
 
 ```text
-D:\obsidian\Bookmarks\_Index.md
-D:\obsidian\Bookmarks\_Inbox.md
-D:\obsidian\Bookmarks\by-domain\*.md
+bookmark-agent --config .\config.toml import-bookmarks --mode summarize --limit 5000
 ```
 
-이 방식은 수천 개 북마크를 Obsidian 노트 수천 개로 바로 쪼개지 않습니다. 대신 도메인별 목록, 전체 인덱스, 처리 후보 목록을 만듭니다. 용량과 파일 수를 작게 유지하면서 전체 북마크 지도를 먼저 확보하는 목적입니다.
+수천 개를 처리할 때도 원문과 자막은 Vault에 저장하지 않습니다. 각 URL은 하나의 요약 Markdown만 만들며, 큐와 재시도 상태는 Vault 밖 앱 데이터의 SQLite에 보관됩니다. 무료 설치에서 이 명령을 실행하면 Pro 기능 안내와 함께 종료됩니다.
 
 필요한 북마크만 요약하려면 `summarize` 모드를 사용합니다.
 
@@ -148,7 +136,7 @@ bookmark-agent --config .\config.toml import-bookmarks --mode summarize --domain
 bookmark-agent --config .\config.toml import-bookmarks --mode summarize --folder AI --limit 100
 ```
 
-수천 개를 한꺼번에 요약하는 것도 가능하게 `--all` 옵션을 둘 수 있지만, 기본값은 제한을 요구합니다. 이유는 간단합니다. 로컬 요약은 돈은 안 들지만 시간이 들고, 일부 사이트는 본문 추출이나 자막 요청이 실패할 수 있기 때문입니다.
+수천 개를 처리하는 동안 확장 프로그램 알림과 `activity.jsonl`에 큐 등록, 추출, 요약, 저장, 실패, 재시도 상태가 기록됩니다. 로컬 Ollama 또는 사용자가 직접 연결한 API는 일일 사용량 제한 없이 동작하지만, 외부 API는 해당 공급자의 요금과 한도를 따릅니다.
 
 ### URL 정규화와 중복 제거
 
@@ -287,12 +275,11 @@ URL 자체가 바뀌면 이야기가 다릅니다.
   -> 이미 처리한 URL인지 확인
   -> trafilatura로 HTML 다운로드 및 본문 추출
   -> 제목, 저자, 게시일, 본문 일부 정리
-  -> Ollama에 요약 요청
-  -> 추천 폴더와 태그 산출
+  -> 선택한 AI 공급자에 요약 요청
   -> Obsidian Markdown 저장
 ```
 
-본문 전체를 Obsidian에 저장하지 않습니다. 요약, 핵심 포인트, 추천 폴더, 추천 태그, 원본 링크만 남깁니다.
+본문 전체를 Obsidian에 저장하지 않습니다. 핵심 요약과 원본 링크만 남깁니다.
 
 ### YouTube 요약 과정
 
@@ -303,7 +290,7 @@ YouTube URL
   -> yt-dlp 메타데이터 조회
   -> 제목, 채널, 길이, 설명 추출
   -> 사용 가능한 자막 또는 자동 자막 조회
-  -> Ollama에 요약 요청
+  -> 선택한 AI 공급자에 요약 요청
   -> Obsidian Markdown 저장
 ```
 
@@ -337,18 +324,31 @@ Transcript unavailable; summarize from metadata and description.
 
 이때는 `processing_failed` 활동 로그가 남고, SQLite 큐에 `retry_count`, `next_retry_at`, `last_error`가 기록됩니다.
 
-### Ollama 로컬 요약
+### AI 공급자
 
-기본 요약기는 Ollama입니다.
+기본 공급자는 Ollama입니다. 외부 API를 선택하면 입력 본문이 해당 공급자로 전송됩니다.
 
 ```toml
 [summarizer]
 provider = "ollama"
 model = "qwen2.5:7b"
-endpoint = "http://localhost:11434/api/generate"
+base_url = "http://localhost:11434"
+api_key_env = ""
+timeout_seconds = 120
 ```
 
-Ollama가 꺼져 있거나 모델이 없으면 작업은 실패로 기록되고 재시도 대상이 됩니다. 클라우드 API 사용량, 광고, 일일 제한이 기본 구조에 들어가지 않습니다.
+Ollama가 꺼져 있거나 모델이 없으면 작업은 실패로 기록되고 재시도 대상이 됩니다. OpenAI 호환 API는 `provider = "openai"`, Gemini는 `provider = "gemini"`, Anthropic은 `provider = "anthropic"`로 선택할 수 있습니다.
+
+```toml
+[summarizer]
+provider = "openai"
+base_url = "https://api.openai.com/v1"
+model = "gpt-5.4-nano"
+api_key_env = "OPENAI_API_KEY"
+timeout_seconds = 120
+```
+
+API 키는 환경 변수로만 읽으며 SQLite, 로그, Vault, Markdown에 저장하지 않습니다.
 
 Ollama 모델은 `/api/generate` 호출 시 Ollama가 로컬에서 로드합니다. 이미 메모리에 올라와 있으면 바로 응답하고, 아직 로드되지 않았다면 첫 요청에서 로드 시간이 걸릴 수 있습니다.
 
@@ -394,8 +394,7 @@ ollama pull qwen2.5:7b
 worker는 처리 과정을 다음 위치에 기록합니다.
 
 ```text
-D:\obsidian\Bookmarks\_Activity.md
-D:\obsidian\.bookmark-agent\activity.jsonl
+%LOCALAPPDATA%\Bookmark Intelligence\<vault-id>\activity.jsonl
 ```
 
 기록되는 단계는 다음과 같습니다.
@@ -406,28 +405,29 @@ batch_started
 processing_started
 extraction_started
 extraction_completed
-ollama_started
-ollama_completed
+summarizer_started
+summarizer_completed
 processing_succeeded
 processing_failed
 ```
 
-특히 `ollama_started`와 `ollama_completed`에는 사용한 Ollama 모델명이 들어갑니다.
+특히 `summarizer_started`와 `summarizer_completed`에는 사용한 공급자와 모델명이 들어갑니다.
 
-Ollama 호출에 실패하면 `processing_failed`에 실패 이유가 남습니다. 예를 들어 모델이 없거나, Ollama가 꺼져 있거나, timeout이 발생하면 `_Activity.md`와 `activity.jsonl`에서 확인할 수 있습니다.
+AI 호출에 실패하면 `processing_failed`에 실패 이유가 남습니다. 상태는 Vault 밖 앱 데이터의 `activity.jsonl`과 브라우저 알림에서 확인할 수 있습니다.
 
 예시:
 
 ```markdown
-## 2026-08-11T04:20:00Z - ollama_started
+## 2026-08-11T04:20:00Z - summarizer_started
 
 - Title: Ollama summary started
-- Message: Calling local Ollama model qwen2.5:7b.
+- Message: Calling ollama model qwen2.5:7b.
 - URL: https://example.com/article
-- Ollama model: qwen2.5:7b
+- Provider: ollama
+- Model: qwen2.5:7b
 ```
 
-현재 기본값은 Windows 데스크톱 알림 대신 브라우저 확장 프로그램 알림을 사용하는 것입니다. worker는 `_Activity.md`와 `activity.jsonl`에 상태를 남기고, 확장 프로그램이 `recent-activity` 명령으로 이를 읽어 브라우저 알림을 띄웁니다.
+현재 기본값은 Windows 데스크톱 알림 대신 브라우저 확장 프로그램 알림을 사용하는 것입니다. worker는 앱 데이터의 `activity.jsonl`에 상태를 남기고, 확장 프로그램이 이를 읽어 브라우저 알림을 띄웁니다.
 
 agent 쪽 활동 기록 설정은 `config.toml`에서 조정합니다.
 
@@ -436,14 +436,14 @@ agent 쪽 활동 기록 설정은 `config.toml`에서 조정합니다.
 enabled = true
 desktop = false
 activity_log = true
-activity_note = true
+activity_note = false
 print_to_console = true
 notify_on_start = false
 notify_on_success = true
 notify_on_failure = true
 ```
 
-모든 과정을 Obsidian에서 보고 싶으면 `activity_note = true`를 유지하면 됩니다. 기본 설정 파일에서는 `desktop = false`입니다.
+활동 노트는 생성하지 않습니다. 기본 설정은 `desktop = false`이며 과정은 브라우저 알림과 콘솔에서 확인합니다.
 
 브라우저 확장 알림은 확장 프로그램 설정 페이지에서 조정합니다.
 
@@ -460,7 +460,7 @@ notify_on_failure = true
 - polling 주기
 - 요약 입력 프롬프트
 
-확장 알림과 다운로드 URL 설정은 브라우저 extension storage에 저장됩니다. 요약 입력 프롬프트는 native host를 통해 Vault 내부 상태 폴더의 `summary-prompt.md`에 저장됩니다. 프롬프트에서는 `{{title}}`, `{{url}}`, `{{source_text}}` 변수를 사용할 수 있습니다. Obsidian Vault 경로, Ollama 모델, SQLite 경로 같은 agent 설정은 여전히 `config.toml`에서 관리합니다.
+확장 알림과 다운로드 URL 설정은 브라우저 extension storage에 저장됩니다. 요약 입력 프롬프트와 SQLite 상태는 Vault 밖 앱 데이터 폴더에 저장됩니다. 프롬프트에서는 `{{title}}`, `{{url}}`, `{{source_text}}` 변수를 사용할 수 있습니다. 공급자와 모델은 `config.toml`에서 관리합니다.
 
 ### 로컬 모델 하드웨어 요구사항
 
@@ -469,21 +469,6 @@ notify_on_failure = true
 기본 설정은 사용 가능한 경우 `qwen2.5:7b`를 사용합니다. 더 큰 모델은 더 많은 RAM/VRAM과 시간이 필요하고, GPU를 사용할 수 없으면 Ollama가 CPU fallback으로 느리게 처리하거나 모델 로드에 실패할 수 있습니다. 모델 로드 실패, Ollama 종료, timeout은 worker에서 `processing_failed`로 기록되고 재시도 대상이 됩니다.
 
 낮은 사양의 컴퓨터에서는 더 작은 Ollama 모델을 설정하는 것이 좋습니다.
-
-### 추천 폴더와 태그
-
-초기 기본값은 자동 이동이 아닙니다.
-
-노트 안에 다음처럼 추천만 남깁니다.
-
-```markdown
-## Recommendation
-
-- Suggested folder: AI/Agents
-- Suggested tags: bookmark, ai, browser
-```
-
-자동으로 브라우저 북마크 폴더를 옮기는 기능은 나중에 옵션으로 켤 수 있게 설계합니다. 처음부터 자동 이동을 켜면 기존 북마크 구조를 예상 밖으로 바꿀 수 있기 때문입니다.
 
 ## 왜 SQLite를 쓰는가
 
@@ -509,10 +494,6 @@ source_url: "https://example.com/article"
 canonical_url: "https://example.com/article"
 resource_type: "webpage"
 processed_at: "2026-08-11T03:30:00Z"
-recommended_folder: "AI/Reading"
-tags:
-  - bookmark
-  - ai
 ---
 
 # Example Article
@@ -721,18 +702,6 @@ bookmark-agent --config .\config.toml test-notification
 bookmark-agent --config .\config.toml simulate-event --title "Diagnostic Bookmark" --url "https://example.com/?utm_source=test"
 ```
 
-기존 북마크 미리보기:
-
-```powershell
-bookmark-agent --config .\config.toml import-bookmarks --mode index --dry-run
-```
-
-기존 북마크 색인 생성:
-
-```powershell
-bookmark-agent --config .\config.toml import-bookmarks --mode index
-```
-
 기존 북마크 일부 요약:
 
 ```powershell
@@ -796,8 +765,8 @@ bookmark-agent --config .\config.toml worker
 - `storage`는 브라우저 프로필별 `profile_id`와 최근 연결 상태를 저장하는 데 사용합니다.
 - `notifications`와 `alarms`는 worker 활동 로그를 주기적으로 확인하고 브라우저 알림을 띄우는 데 사용합니다.
 - 확장 프로그램은 파일 시스템에 직접 접근하지 않습니다.
-- 로컬 에이전트는 설정된 Vault 경로 아래에만 상태와 Markdown을 씁니다.
-- Ollama 호출은 `localhost` 기준입니다.
+- 로컬 에이전트는 Markdown만 설정된 Vault에 쓰고, 상태/큐/활동 로그는 Vault 밖 앱 데이터에 씁니다.
+- AI 호출은 기본적으로 localhost Ollama이며, 사용자가 설정한 외부 API도 지원합니다.
 - YouTube 영상 파일은 저장하지 않습니다.
 - 전체 웹페이지 아카이브를 저장하지 않습니다.
 - 사용자 알림은 기본적으로 Chrome/Firefox 확장 알림으로 표시됩니다.
@@ -817,15 +786,14 @@ bookmark-agent --config .\config.toml worker
 1. Worker가 실행 중인지 확인합니다.
 2. Ollama가 켜져 있는지 확인합니다.
 3. `ollama list`에서 설정된 모델이 있는지 확인합니다.
-4. `.bookmark-agent`의 SQLite 큐에 실패 상태가 쌓였는지 확인합니다.
+4. OS별 앱 데이터 폴더의 SQLite 큐에 실패 상태가 쌓였는지 확인합니다.
 
 ### 작업이 큐에 들어갔는지 확인하고 싶을 때
 
-실시간 북마크 이벤트나 `import-bookmarks --mode summarize`로 선택된 URL은 SQLite의 `resources` 큐에 들어갑니다. 사용자가 직접 DB를 열지 않아도, 처리 시작과 결과는 다음 파일에서 확인할 수 있습니다.
+실시간 북마크 이벤트는 앱 데이터 폴더의 SQLite `resources` 큐에 들어갑니다. 기존 북마크 대량 분석은 Pro 기능입니다. 사용자가 직접 DB를 열지 않아도 처리 시작과 결과는 브라우저 알림과 콘솔에서 확인할 수 있습니다.
 
 ```text
-D:\obsidian\Bookmarks\_Activity.md
-D:\obsidian\.bookmark-agent\activity.jsonl
+%LOCALAPPDATA%\Bookmark Intelligence\<vault-id>\activity.jsonl
 ```
 
 작업이 들어갔는데 요약이 늦는 경우에는 보통 다음 중 하나입니다.
@@ -843,23 +811,21 @@ Ollama가 꺼져 있거나 모델 로드에 실패하면 해당 URL은 바로 �
 확인할 위치:
 
 ```text
-D:\obsidian\Bookmarks\_Activity.md
-D:\obsidian\.bookmark-agent\activity.jsonl
+%LOCALAPPDATA%\Bookmark Intelligence\<vault-id>\activity.jsonl
 ```
 
 해결 순서:
 
-1. `ollama list`로 모델이 있는지 확인합니다.
-2. 없으면 `ollama pull qwen2.5:7b`로 설치합니다.
-3. Ollama가 실행 중인지 확인합니다.
-4. `bookmark-agent --config .\config.toml doctor`로 연결과 모델 상태를 확인합니다.
-5. GPU 문제라면 Ollama 로그를 확인합니다. agent는 GPU를 직접 고르지 않고 Ollama의 성공/실패 결과를 따릅니다.
+1. 설정된 공급자의 endpoint와 모델을 확인합니다.
+2. Ollama라면 `ollama list`로 모델이 있는지 확인하고, 없으면 `ollama pull qwen2.5:7b`로 설치합니다.
+3. `bookmark-agent --config .\config.toml doctor`로 연결과 모델 상태를 확인합니다.
+4. GPU 문제라면 Ollama 로그를 확인합니다. agent는 GPU를 직접 고르지 않고 런타임의 성공/실패 결과를 따릅니다.
 
 ### YouTube 자막이 비어 있을 때
 
 일부 영상은 자막이 없거나 자동 자막 접근이 제한될 수 있습니다. 자막만 실패한 경우에는 제목, 채널, 길이, 설명을 기반으로 요약을 계속 진행합니다. 이 경우 노트는 생성될 수 있지만, 실제 발화 내용이 빠져 요약 정확도가 낮아질 수 있습니다.
 
-반대로 `yt-dlp`가 영상 정보 자체를 가져오지 못하거나 Ollama 호출이 실패하면 작업은 `processing_failed`로 기록됩니다. 이 상태는 `D:\obsidian\Bookmarks\_Activity.md`와 `D:\obsidian\.bookmark-agent\activity.jsonl`에서 확인할 수 있습니다.
+반대로 `yt-dlp`가 영상 정보 자체를 가져오지 못하거나 AI 호출이 실패하면 작업은 `processing_failed`로 기록되고 재시도됩니다. 이 상태는 앱 데이터의 `activity.jsonl`과 확장 프로그램 알림에서 확인할 수 있습니다.
 
 ## 현재 검증된 동작
 
@@ -868,7 +834,7 @@ D:\obsidian\.bookmark-agent\activity.jsonl
 - YouTube 북마크 메타데이터 처리
 - Ollama 로컬 요약
 - `D:\obsidian\Bookmarks`에 Markdown 노트 생성
-- 기존 북마크 대량 색인 생성
+- 기존 북마크 대량 분석은 Pro 큐로 제공
 - 진단 명령 `doctor` 통과
 
 ## 라이선스

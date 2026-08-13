@@ -72,7 +72,8 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
             "vault_path": str(config.obsidian.vault_path),
             "database_path": str(config.database.path),
             "notes_subdir": config.obsidian.notes_subdir,
-            "ollama_model": config.ollama.model,
+            "provider": config.summarizer.provider,
+            "model": config.summarizer.model,
             "summary_prompt": read_summary_prompt(config),
             "default_summary_prompt": DEFAULT_SUMMARY_PROMPT,
             "summary_prompt_path": str(prompt_path(config)),
@@ -90,6 +91,8 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
         }
 
     if command == "import-bookmarks":
+        if not config.features.pro_enabled:
+            return {"ok": False, "error": "Existing bookmark bulk analysis is a Pro feature."}
         mode = message.get("mode") or "index"
         if mode != "index":
             return {"ok": False, "error": "Native import currently supports index mode only."}
@@ -121,7 +124,8 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
         "vault_path": str(config.obsidian.vault_path),
         "database_path": str(config.database.path),
         "notes_subdir": config.obsidian.notes_subdir,
-        "ollama_model": config.ollama.model,
+        "provider": config.summarizer.provider,
+        "model": config.summarizer.model,
     }
 
 

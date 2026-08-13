@@ -195,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "import-bookmarks":
         init_db(config.database.path)
+        if not config.features.pro_enabled:
+            raise SystemExit("Existing bookmark bulk analysis is a Pro feature. Use the subscription-enabled desktop app.")
         if args.mode == "summarize" and args.limit is None and not args.all and not args.dry_run:
             raise SystemExit("summarize mode can enqueue many jobs. Use --limit N or --all.")
         filters = ImportFilters(
@@ -227,8 +229,8 @@ def main(argv: list[str] | None = None) -> int:
             config,
             "notification_test",
             "Bookmark Agent notification test",
-            f"Notifications are enabled. Ollama model: {config.ollama.model}.",
-            details={"ollama_model": config.ollama.model},
+            f"Notifications are enabled. {config.summarizer.provider} model: {config.summarizer.model}.",
+            details={"provider": config.summarizer.provider, "model": config.summarizer.model},
             notify=True,
         )
         print("Wrote activity entry and requested desktop notification.")
