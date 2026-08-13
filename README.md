@@ -347,7 +347,7 @@ api_key_env = ""
 timeout_seconds = 120
 ```
 
-Ollama가 꺼져 있거나 모델이 없으면 작업은 실패로 기록되고 재시도 대상이 됩니다. OpenAI 호환 API는 `provider = "openai"`, Gemini는 `provider = "gemini"`, Anthropic은 `provider = "anthropic"`로 선택할 수 있습니다.
+Ollama가 꺼져 있거나 모델이 없으면 작업은 실패로 기록되고 재시도 대상이 됩니다. OpenAI 호환 API는 `provider = "openai"`, Gemini는 `provider = "gemini"`, Anthropic은 `provider = "anthropic"`로 선택할 수 있습니다. 유료 hosted gateway를 사용할 때는 `provider = "hosted"`를 선택합니다.
 
 ```toml
 [summarizer]
@@ -359,6 +359,8 @@ timeout_seconds = 120
 ```
 
 API 키는 환경 변수로만 읽으며 SQLite, 로그, Vault, Markdown에 저장하지 않습니다.
+
+`hosted`는 `[entitlements]`의 account ID와 bearer token을 사용해 중앙 gateway를 호출하며 성공한 요약 1건당 hosted credit 1개를 차감합니다. gateway 운영자는 upstream OpenAI-compatible API 키를 환경 변수에만 보관합니다.
 
 ### Pro entitlement
 

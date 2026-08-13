@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import requests
 import os
+import hashlib
 
 from .config import AppConfig
 from .vault_state import state_dir
@@ -61,7 +62,7 @@ def summarize(config: AppConfig, title: str, url: str, text: str) -> str:
     provider = config.summarizer.provider
     api_key = os.environ.get(config.summarizer.api_key_env) if config.summarizer.api_key_env else None
     headers = {"Content-Type": "application/json"}
-    if api_key and provider in {"openai", "anthropic"}:
+    if api_key and provider in {"openai", "anthropic", "hosted"}:
         headers["Authorization"] = f"Bearer {api_key}"
 
     if provider == "ollama":
@@ -77,6 +78,20 @@ def summarize(config: AppConfig, title: str, url: str, text: str) -> str:
         headers["x-api-key"] = api_key or ""
         headers["anthropic-version"] = "2023-06-01"
         payload = {"model": config.summarizer.model, "max_tokens": 600, "messages": [{"role": "user", "content": prompt}]}
+    elif provider == "hosted":
+        if not config.entitlements.account_id:
+            raise ValueError("Hosted provider requires entitlements.account_id")
+        request_id = hashlib.sha256(f"{url}\n{prompt}".encode("utf-8")).hexdigest()
+        endpoint = f"{config.summarizer.base_url.rstrip('/')}/v1/summarize"
+        payload = {
+            "account_id": config.entitlements.account_id,
+            "request_id": request_id,
+            "title": title,
+            "url": url,
+            "prompt": prompt,
+            "source_text": text[:12000],
+            "model": config.summarizer.model,
+        }
     else:
         endpoint = f"{config.summarizer.base_url}/chat/completions"
         payload = {"model": config.summarizer.model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.2}
@@ -90,6 +105,8 @@ def summarize(config: AppConfig, title: str, url: str, text: str) -> str:
         result = (((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [{}])[0].get("text")
     elif provider == "anthropic":
         result = (((data.get("content") or [{}])[0]).get("text"))
+    elif provider == "hosted":
+        result = data.get("summary")
     else:
         result = (((data.get("choices") or [{}])[0].get("message") or {}).get("content"))
     return (result or "").strip()

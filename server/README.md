@@ -42,6 +42,18 @@ Invoke-RestMethod http://127.0.0.1:8787/v1/usage/consume -Method Post -Headers @
 
 The operation requires an active paid plan, decrements `hosted_credits` atomically, and returns HTTP 402 when the balance is insufficient. Repeating the same request key does not charge twice. Local Ollama and user-owned provider API keys do not use this endpoint.
 
+Run the optional hosted gateway separately:
+
+```powershell
+$env:BILLING_ENDPOINT = "https://billing.example.com"
+$env:HOSTED_AI_BASE_URL = "https://api.openai.com/v1"
+$env:HOSTED_AI_API_KEY = "server-side-upstream-key"
+$env:HOSTED_AI_MODEL = "gpt-4o-mini"
+.venv\Scripts\python.exe .\server\hosted_gateway.py
+```
+
+The gateway accepts `POST /v1/summarize` with `account_id`, `request_id`, `prompt`, `source_text`, and optional `model`. It performs the billing entitlement check before the upstream call, then charges one credit only after a non-empty upstream summary is returned. Deploy it behind HTTPS and keep the upstream key out of the repository and client configuration.
+
 The generic HMAC endpoint remains available at other `/v1/webhooks/<provider>` paths for already-verified self-hosted adapters and local tests. It is not a substitute for provider-specific verification.
 
 The service applies a small per-process, per-IP rate limit to API, authentication, entitlement, and webhook requests and rejects JSON bodies larger than 1 MiB. A public deployment still needs an HTTPS reverse proxy, distributed rate limiting, a managed database backup, email verification, password reset, and a secrets manager. The included service is a reference implementation, not a complete hosted payment product.

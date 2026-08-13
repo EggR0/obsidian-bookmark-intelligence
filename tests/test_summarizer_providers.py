@@ -19,7 +19,9 @@ class _ProviderHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         body = json.loads(self.rfile.read(length) or b"{}")
         self.__class__.requests.append({"path": self.path, "headers": dict(self.headers), "body": body})
-        if self.path.startswith("/api/generate"):
+        if self.path.startswith("/v1/summarize"):
+            payload = {"summary": "hosted result"}
+        elif self.path.startswith("/api/generate"):
             payload = {"response": "ollama result"}
         elif self.path.startswith("/models/"):
             payload = {"candidates": [{"content": {"parts": [{"text": "gemini result"}]}}]}
@@ -71,11 +73,22 @@ class SummarizerProviderTests(unittest.TestCase):
                 config = replace(base, summarizer=replace(base.summarizer, provider=provider, model=model, base_url=base_url, api_key_env=api_key_env, timeout_seconds=5))
                 self.assertEqual(summarize(config, "Title", "https://example.com", "Source"), expected)
 
-            paths = [request["path"] for request in _ProviderHandler.requests[-4:]]
+            import os
+
+            os.environ["TEST_HOSTED_TOKEN"] = "test-token"
+            hosted_config = replace(
+                base,
+                entitlements=replace(base.entitlements, account_id="acct-hosted"),
+                summarizer=replace(base.summarizer, provider="hosted", model="hosted-model", base_url=f"http://127.0.0.1:{port}", api_key_env="TEST_HOSTED_TOKEN", timeout_seconds=5),
+            )
+            self.assertEqual(summarize(hosted_config, "Title", "https://example.com", "Source"), "hosted result")
+
+            paths = [request["path"] for request in _ProviderHandler.requests[-5:]]
             self.assertTrue(paths[0].startswith("/api/generate"))
             self.assertTrue(paths[1].startswith("/chat/completions"))
             self.assertTrue(paths[2].startswith("/models/test-model:generateContent"))
             self.assertTrue(paths[3].startswith("/messages"))
+            self.assertTrue(paths[4].startswith("/v1/summarize"))
 
 
 if __name__ == "__main__":

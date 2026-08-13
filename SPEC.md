@@ -147,6 +147,7 @@ If YouTube subtitles are unavailable, metadata and description can still be summ
 - `openai`: OpenAI-compatible `/chat/completions` endpoint.
 - `gemini`: Gemini `generateContent` endpoint.
 - `anthropic`: Anthropic Messages endpoint.
+- `hosted`: Bookmark Intelligence hosted gateway at `/v1/summarize`; the gateway checks entitlement, calls an OpenAI-compatible upstream, and consumes one hosted credit after a successful summary.
 - Other OpenAI-compatible providers by setting `provider` and `base_url` as appropriate.
 
 API keys are read only from the environment variable named by `api_key_env`. They are not written to SQLite, logs, prompts, or Markdown.

@@ -141,6 +141,7 @@ def load_config(path: Path) -> AppConfig:
         "openai": "https://api.openai.com/v1",
         "gemini": "https://generativelanguage.googleapis.com/v1beta",
         "anthropic": "https://api.anthropic.com/v1",
+        "hosted": "http://127.0.0.1:8788",
     }.get(provider, "http://localhost:11434")
 
     return AppConfig(

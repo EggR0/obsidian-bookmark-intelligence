@@ -6,6 +6,7 @@ vault_path = "D:\\obsidian"
 notes_subdir = "Bookmarks"
 
 [summarizer]
+# Set provider to hosted to use the optional central gateway documented in server/README.md.
 provider = "ollama"
 base_url = "http://localhost:11434"
 model = "qwen2.5:7b"
