@@ -41,6 +41,22 @@ jobs:
           Copy-Item -Recurse extension,obsidian-plugin,src,server,scripts -Destination package/
           Copy-Item outputs/bookmark-agent-native.exe,outputs/chrome-extension.zip,outputs/firefox-extension.xpi,outputs/obsidian-bookmark-intelligence-plugin.zip -Destination package/outputs/
           Compress-Archive -Path package/* -DestinationPath outputs/bookmark-intelligence-windows.zip
+      - name: Create release checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            'outputs/bookmark-intelligence-windows.zip',
+            'outputs/bookmark-intelligence-source.zip',
+            'outputs/chrome-extension.zip',
+            'outputs/firefox-extension.xpi',
+            'outputs/obsidian-bookmark-intelligence-plugin.zip',
+            'outputs/bookmark-agent-native.exe'
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path -Leaf $file)"
+          }
+          $lines | Set-Content -Encoding ascii outputs/SHA256SUMS.txt
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -52,3 +68,4 @@ jobs:
             outputs/obsidian-bookmark-intelligence-plugin.zip
             outputs/bookmark-intelligence-source.zip
             outputs/bookmark-intelligence-windows.zip
+            outputs/SHA256SUMS.txt

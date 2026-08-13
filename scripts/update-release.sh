@@ -5,16 +5,26 @@ VAULT_PATH="${VAULT_PATH:-$HOME/Obsidian}"
 SKIP_OPEN="${SKIP_OPEN:-0}"
 SKIP_START_WORKER="${SKIP_START_WORKER:-0}"
 DOWNLOAD_URL="https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest/download/bookmark-intelligence-source.zip"
+CHECKSUM_URL="https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest/download/SHA256SUMS.txt"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/bookmark-intelligence-update.XXXXXX")"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 if command -v curl >/dev/null 2>&1; then
   curl --fail --location --silent --show-error "$DOWNLOAD_URL" --output "$TMP_ROOT/release.zip"
+  curl --fail --location --silent --show-error "$CHECKSUM_URL" --output "$TMP_ROOT/SHA256SUMS.txt"
 elif command -v wget >/dev/null 2>&1; then
   wget --https-only --quiet --output-document="$TMP_ROOT/release.zip" "$DOWNLOAD_URL"
+  wget --https-only --quiet --output-document="$TMP_ROOT/SHA256SUMS.txt" "$CHECKSUM_URL"
 else
   echo "curl or wget is required" >&2
+  exit 1
+fi
+
+EXPECTED_HASH="$(awk '$2 == "bookmark-intelligence-source.zip" {print $1; exit}' "$TMP_ROOT/SHA256SUMS.txt")"
+ACTUAL_HASH="$(sha256sum "$TMP_ROOT/release.zip" | awk '{print $1}')"
+if [[ -z "$EXPECTED_HASH" || "$ACTUAL_HASH" != "$EXPECTED_HASH" ]]; then
+  echo "Release checksum verification failed." >&2
   exit 1
 fi
 
