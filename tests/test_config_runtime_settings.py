@@ -6,6 +6,8 @@ import tempfile
 import unittest
 
 from bookmark_agent.config import load_config, runtime_settings_path, save_runtime_settings
+from bookmark_agent.native_host import _handle_control_message
+from bookmark_agent.summarizer import read_summary_prompt, write_summary_prompt
 
 
 class RuntimeSettingsTests(unittest.TestCase):
@@ -35,6 +37,25 @@ class RuntimeSettingsTests(unittest.TestCase):
             self.assertEqual(applied.summarizer.model, "gpt-test")
             self.assertEqual(applied.summarizer.api_key_env, "BOOKMARK_TEST_KEY")
             self.assertNotIn("secret", path.read_text(encoding="utf-8"))
+
+    def test_ai_settings_save_does_not_clear_summary_prompt(self) -> None:
+        base = load_config(Path("config.toml"))
+        with tempfile.TemporaryDirectory() as directory:
+            vault = Path(directory) / "vault"
+            config = replace(base, obsidian=replace(base.obsidian, vault_path=vault))
+            write_summary_prompt(config, "keep this prompt")
+            response = _handle_control_message(
+                config,
+                {
+                    "command": "save-agent-settings",
+                    "provider": "ollama",
+                    "model": "qwen2.5:1.5b",
+                    "base_url": "http://localhost:11434",
+                    "api_key_env": "",
+                },
+            )
+            self.assertTrue(response["ok"])
+            self.assertEqual(read_summary_prompt(config), "keep this prompt")
 
 
 if __name__ == "__main__":

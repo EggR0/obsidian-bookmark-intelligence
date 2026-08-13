@@ -523,11 +523,11 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
   withProfileId({
     schema_version: 1,
     command: "save-agent-settings",
-    summary_prompt: message.summaryPrompt || "",
     provider: message.provider,
     model: message.model,
     base_url: message.baseUrl,
     api_key_env: message.apiKeyEnv,
+    ...(typeof message.summaryPrompt === "string" ? { summary_prompt: message.summaryPrompt } : {}),
     source: {
       browser: detectBrowser(),
       extension: EXTENSION_NAME
