@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 from server.billing_service import RateLimiter, create_server
 from server.provider_adapters import verify_standard_webhook
@@ -170,6 +171,46 @@ class BillingServiceTests(unittest.TestCase):
         status, reused = self.request("POST", "/v1/team/invites/accept", {"invite_token": invite["invite_token"]}, headers={"Authorization": f"Bearer {member['access_token']}"})
         self.assertEqual(status, 400)
         self.assertFalse(reused["ok"])
+
+    def test_email_verification_and_password_reset_revoke_sessions(self) -> None:
+        from server.billing_service import BillingService
+
+        service = BillingService(
+            Path(self.tempdir.name) / "auth.sqlite3",
+            "test-webhook-secret",
+            require_email_verification=True,
+            expose_action_tokens=True,
+        )
+        registered = service.register("secure@example.com", "old-password-123")
+        self.assertNotIn("access_token", registered)
+        with self.assertRaises(PermissionError):
+            service.login("secure@example.com", "old-password-123")
+        verified = service.verify_email(registered["token"])
+        self.assertTrue(verified["email_verified"])
+        logged_in = service.login("secure@example.com", "old-password-123")
+        reset = service.request_password_reset("secure@example.com")
+        self.assertTrue(reset["ok"])
+        service.reset_password(reset["token"], "new-password-123")
+        with self.assertRaises(PermissionError):
+            service.entitlement(registered["account_id"], logged_in["access_token"])
+        new_login = service.login("secure@example.com", "new-password-123")
+        self.assertTrue(new_login["access_token"])
+
+    def test_smtp_sender_uses_configured_transport(self) -> None:
+        from server.billing_service import BillingService
+
+        service = BillingService(
+            Path(self.tempdir.name) / "smtp.sqlite3",
+            "test-webhook-secret",
+            smtp_settings={"host": "smtp.example.test", "port": 587, "username": "mailer", "password": "secret", "from": "mailer@example.test", "starttls": True},
+        )
+        with patch("server.billing_service.smtplib.SMTP") as smtp_class:
+            service._send_email("person@example.test", "Subject", "Body")
+        smtp_class.assert_called_once_with("smtp.example.test", 587, timeout=15)
+        client = smtp_class.return_value.__enter__.return_value
+        client.starttls.assert_called_once_with()
+        client.login.assert_called_once_with("mailer", "secret")
+        client.send_message.assert_called_once()
 
     def test_standard_webhook_signature(self) -> None:
         secret = base64.b64encode(b"polar-secret").decode("ascii")

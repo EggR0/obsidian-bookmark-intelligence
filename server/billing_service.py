@@ -15,6 +15,8 @@ import time
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 import base64
+from email.message import EmailMessage
+import smtplib
 
 try:
     from .provider_adapters import normalize_polar, normalize_toss, verify_standard_webhook
@@ -81,10 +83,14 @@ class RateLimiter:
 
 
 class BillingService:
-    def __init__(self, database_path: Path, webhook_secret: str, toss_secret_key: str = ""):
+    def __init__(self, database_path: Path, webhook_secret: str, toss_secret_key: str = "", smtp_settings: dict | None = None, require_email_verification: bool = False, public_base_url: str = "", expose_action_tokens: bool = False):
         self.database_path = database_path
         self.webhook_secret = webhook_secret
         self.toss_secret_key = toss_secret_key
+        self.smtp_settings = smtp_settings or {}
+        self.require_email_verification = require_email_verification
+        self.public_base_url = public_base_url.rstrip("/")
+        self.expose_action_tokens = expose_action_tokens
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
@@ -114,6 +120,7 @@ class BillingService:
                   email TEXT NOT NULL UNIQUE,
                   password_salt BLOB NOT NULL,
                   password_hash BLOB NOT NULL,
+                  email_verified INTEGER NOT NULL DEFAULT 1,
                   created_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS access_tokens (
@@ -181,8 +188,20 @@ class BillingService:
                   created_at TEXT NOT NULL,
                   FOREIGN KEY(owner_account_id) REFERENCES accounts(account_id)
                 );
+                CREATE TABLE IF NOT EXISTS auth_action_tokens (
+                  token_hash TEXT PRIMARY KEY,
+                  account_id TEXT NOT NULL,
+                  purpose TEXT NOT NULL,
+                  expires_at TEXT NOT NULL,
+                  used_at TEXT,
+                  created_at TEXT NOT NULL,
+                  FOREIGN KEY(account_id) REFERENCES accounts(account_id)
+                );
                 """
             )
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(accounts)").fetchall()}
+            if "email_verified" not in columns:
+                connection.execute("ALTER TABLE accounts ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1")
 
     @staticmethod
     def _password_hash(password: str, salt: bytes) -> bytes:
@@ -197,6 +216,46 @@ class BillingService:
             raise ValueError("Password must be at least 12 characters")
         return normalized, password
 
+    def _send_email(self, recipient: str, subject: str, body: str) -> None:
+        if not self.smtp_settings.get("host"):
+            raise ValueError("SMTP is not configured; set SMTP_HOST before enabling email delivery")
+        message = EmailMessage()
+        message["From"] = self.smtp_settings.get("from") or self.smtp_settings.get("username") or "bookmark-intelligence@localhost"
+        message["To"] = recipient
+        message["Subject"] = subject
+        message.set_content(body)
+        port = int(self.smtp_settings.get("port") or 587)
+        with smtplib.SMTP(self.smtp_settings["host"], port, timeout=15) as client:
+            if self.smtp_settings.get("starttls", True):
+                client.starttls()
+            username = self.smtp_settings.get("username")
+            if username:
+                client.login(username, self.smtp_settings.get("password") or "")
+            client.send_message(message)
+
+    def _issue_action_token(self, account_id: str, purpose: str, ttl_hours: int = 24) -> str:
+        token = secrets.token_urlsafe(32)
+        now = utc_now()
+        expires_at = (datetime.now(UTC) + timedelta(hours=ttl_hours)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        with self._db() as connection:
+            connection.execute("UPDATE auth_action_tokens SET used_at = ? WHERE account_id = ? AND purpose = ? AND used_at IS NULL", (now, account_id, purpose))
+            connection.execute("INSERT INTO auth_action_tokens (token_hash, account_id, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)", (hashlib.sha256(token.encode("utf-8")).hexdigest(), account_id, purpose, expires_at, now))
+        return token
+
+    def _action_token_account(self, token: str, purpose: str) -> tuple[str, sqlite3.Row]:
+        token_hash = hashlib.sha256(token.strip().encode("utf-8")).hexdigest()
+        with self._db() as connection:
+            row = connection.execute("SELECT * FROM auth_action_tokens WHERE token_hash = ? AND purpose = ? AND used_at IS NULL", (token_hash, purpose)).fetchone()
+        if not row or _parse_expiry(row["expires_at"]) is None or row["expires_at"] <= utc_now():
+            raise ValueError("The authentication token is invalid or expired")
+        return row["account_id"], row
+
+    def _action_token_response(self, token: str, purpose: str) -> dict:
+        result = {"purpose": purpose, "expires_in_hours": 24}
+        if self.expose_action_tokens:
+            result["token"] = token
+        return result
+
     def register(self, email: str, password: str) -> dict:
         email, password = self._validate_credentials(email, password)
         account_id = f"acct_{secrets.token_urlsafe(12)}"
@@ -205,8 +264,8 @@ class BillingService:
         try:
             with self._db() as connection:
                 connection.execute(
-                    "INSERT INTO accounts (account_id, email, password_salt, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
-                    (account_id, email, salt, password_hash, utc_now()),
+                    "INSERT INTO accounts (account_id, email, password_salt, password_hash, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (account_id, email, salt, password_hash, 0 if self.require_email_verification else 1, utc_now()),
                 )
                 connection.execute(
                     "INSERT INTO subscriptions (account_id, plan, status, hosted_credits, updated_at) VALUES (?, 'Free', 'active', 0, ?)",
@@ -214,7 +273,15 @@ class BillingService:
                 )
         except sqlite3.IntegrityError as error:
             raise ValueError("An account with this email already exists") from error
-        return self._issue_token(account_id)
+        if not self.require_email_verification:
+            return self._issue_token(account_id)
+        result = {"account_id": account_id, "token_type": "Bearer"}
+        action_token = self._issue_action_token(account_id, "email_verification")
+        if self.smtp_settings.get("host"):
+            self._send_email(email, "Verify your Bookmark Intelligence account", f"Verify your account with this token:\n\n{action_token}\n")
+        result["email_verification_required"] = True
+        result.update(self._action_token_response(action_token, "email_verification"))
+        return result
 
     def login(self, email: str, password: str) -> dict:
         email, password = self._validate_credentials(email, password)
@@ -222,7 +289,40 @@ class BillingService:
             account = connection.execute("SELECT * FROM accounts WHERE email = ?", (email,)).fetchone()
         if not account or not hmac.compare_digest(self._password_hash(password, account["password_salt"]), account["password_hash"]):
             raise ValueError("Invalid email or password")
+        if self.require_email_verification and not account["email_verified"]:
+            raise PermissionError("Email verification is required before login")
         return self._issue_token(account["account_id"])
+
+    def verify_email(self, token: str) -> dict:
+        account_id, action = self._action_token_account(token, "email_verification")
+        with self._db() as connection:
+            connection.execute("UPDATE accounts SET email_verified = 1 WHERE account_id = ?", (account_id,))
+            connection.execute("UPDATE auth_action_tokens SET used_at = ? WHERE token_hash = ?", (utc_now(), action["token_hash"]))
+        return {"ok": True, "account_id": account_id, "email_verified": True}
+
+    def request_password_reset(self, email: str) -> dict:
+        normalized = email.strip().lower()
+        with self._db() as connection:
+            account = connection.execute("SELECT account_id, email FROM accounts WHERE email = ?", (normalized,)).fetchone()
+        result = {"ok": True, "message": "If the account exists, reset instructions have been sent."}
+        if not account:
+            return result
+        action_token = self._issue_action_token(account["account_id"], "password_reset")
+        if self.smtp_settings.get("host"):
+            self._send_email(account["email"], "Reset your Bookmark Intelligence password", f"Reset your password with this token:\n\n{action_token}\n")
+        result.update(self._action_token_response(action_token, "password_reset"))
+        return result
+
+    def reset_password(self, token: str, password: str) -> dict:
+        self._validate_credentials("reset@example.com", password)
+        account_id, action = self._action_token_account(token, "password_reset")
+        salt = secrets.token_bytes(16)
+        password_hash = self._password_hash(password, salt)
+        with self._db() as connection:
+            connection.execute("UPDATE accounts SET password_salt = ?, password_hash = ? WHERE account_id = ?", (salt, password_hash, account_id))
+            connection.execute("UPDATE auth_action_tokens SET used_at = ? WHERE token_hash = ?", (utc_now(), action["token_hash"]))
+            connection.execute("DELETE FROM access_tokens WHERE account_id = ?", (account_id,))
+        return {"ok": True, "account_id": account_id, "sessions_revoked": True}
 
     def _issue_token(self, account_id: str) -> dict:
         token = secrets.token_urlsafe(32)
@@ -330,7 +430,14 @@ class BillingService:
                 raise ForbiddenError(f"The {subscription['plan']} plan has no available seats")
             connection.execute("INSERT INTO team_invites (invite_id, owner_account_id, member_account_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)", (invite_id, owner_account_id, member_account_id, token_hash, expires_at, created_at))
             connection.execute("INSERT INTO team_audit_events (owner_account_id, actor_account_id, event_type, member_account_id, invite_id, created_at) VALUES (?, ?, 'invite_created', ?, ?, ?)", (owner_account_id, owner_account_id, member_account_id, invite_id, created_at))
-        return {"ok": True, "invite_id": invite_id, "member_account_id": member_account_id, "expires_at": expires_at, "invite_token": invite_token}
+        delivery = "manual"
+        if self.smtp_settings.get("host"):
+            self._send_email(member_email, "Bookmark Intelligence team invitation", f"You have been invited to a Bookmark Intelligence team.\n\nInvite token:\n{invite_token}\n\nIt expires at {expires_at}.\n")
+            delivery = "smtp"
+        result = {"ok": True, "invite_id": invite_id, "member_account_id": member_account_id, "expires_at": expires_at, "delivery": delivery}
+        if self.expose_action_tokens or delivery == "manual":
+            result["invite_token"] = invite_token
+        return result
 
     def accept_team_invite(self, token: str | None, invite_token: str) -> dict:
         member_account_id = self._account_for_token(token)
@@ -639,6 +746,18 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
                 result = self.service.login(str(payload.get("email", "")), str(payload.get("password", "")))
                 self._write(HTTPStatus.OK, result)
                 return
+            if self.path == "/v1/auth/verify-email":
+                result = self.service.verify_email(str(payload.get("token", "")))
+                self._write(HTTPStatus.OK, result)
+                return
+            if self.path == "/v1/auth/request-password-reset":
+                result = self.service.request_password_reset(str(payload.get("email", "")))
+                self._write(HTTPStatus.OK, result)
+                return
+            if self.path == "/v1/auth/reset-password":
+                result = self.service.reset_password(str(payload.get("token", "")), str(payload.get("password", "")))
+                self._write(HTTPStatus.OK, result)
+                return
             if self.path == "/v1/orders":
                 result = self.service.create_payment_order(self._bearer(), str(payload.get("order_id", "")), str(payload.get("plan", "")))
                 self._write(HTTPStatus.CREATED, result)
@@ -697,8 +816,8 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
         return
 
 
-def create_server(host: str, port: int, database_path: Path, webhook_secret: str, toss_secret_key: str = "") -> ThreadingHTTPServer:
-    service = BillingService(database_path, webhook_secret, toss_secret_key)
+def create_server(host: str, port: int, database_path: Path, webhook_secret: str, toss_secret_key: str = "", smtp_settings: dict | None = None, require_email_verification: bool = False, public_base_url: str = "", expose_action_tokens: bool = False) -> ThreadingHTTPServer:
+    service = BillingService(database_path, webhook_secret, toss_secret_key, smtp_settings, require_email_verification, public_base_url, expose_action_tokens)
 
     class Handler(BillingRequestHandler):
         pass
@@ -720,10 +839,19 @@ def main() -> int:
     parser.add_argument("--database", type=Path, default=Path(os.environ.get("BILLING_DATABASE", "billing.sqlite3")))
     parser.add_argument("--webhook-secret", default=os.environ.get("BOOKMARK_INTELLIGENCE_WEBHOOK_SECRET", ""))
     parser.add_argument("--toss-secret-key", default=os.environ.get("TOSS_SECRET_KEY", ""))
+    parser.add_argument("--require-email-verification", action="store_true", default=os.environ.get("REQUIRE_EMAIL_VERIFICATION", "0") == "1")
     args = parser.parse_args()
     if not args.webhook_secret:
         parser.error("--webhook-secret or BOOKMARK_INTELLIGENCE_WEBHOOK_SECRET is required")
-    server = create_server(args.host, args.port, args.database, args.webhook_secret, args.toss_secret_key)
+    smtp_settings = {
+        "host": os.environ.get("SMTP_HOST", ""),
+        "port": os.environ.get("SMTP_PORT", "587"),
+        "username": os.environ.get("SMTP_USERNAME", ""),
+        "password": os.environ.get("SMTP_PASSWORD", ""),
+        "from": os.environ.get("SMTP_FROM", ""),
+        "starttls": os.environ.get("SMTP_STARTTLS", "1") != "0",
+    }
+    server = create_server(args.host, args.port, args.database, args.webhook_secret, args.toss_secret_key, smtp_settings, args.require_email_verification, os.environ.get("PUBLIC_BASE_URL", ""), os.environ.get("EXPOSE_AUTH_ACTION_TOKENS", "0") == "1")
     print(f"Billing service listening on http://{args.host}:{args.port}", flush=True)
     try:
         server.serve_forever()

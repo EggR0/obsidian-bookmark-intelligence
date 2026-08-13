@@ -20,6 +20,20 @@ For Polar, use the base64-encoded signing secret shown by Polar. `TOSS_SECRET_KE
 $env:TOSS_SECRET_KEY = "test_sk_..."
 ```
 
+Optional account email security can be enabled for a public deployment:
+
+```powershell
+$env:REQUIRE_EMAIL_VERIFICATION = "1"
+$env:SMTP_HOST = "smtp.example.com"
+$env:SMTP_PORT = "587"
+$env:SMTP_USERNAME = "mailer@example.com"
+$env:SMTP_PASSWORD = "read-from-a-secret-manager"
+$env:SMTP_FROM = "Bookmark Intelligence <mailer@example.com>"
+$env:SMTP_STARTTLS = "1"
+```
+
+With verification required, registration creates a one-time email-verification token and login is denied until `POST /v1/auth/verify-email` consumes it. `POST /v1/auth/request-password-reset` always returns a generic response to avoid account enumeration; the service sends a reset token when SMTP is configured. `POST /v1/auth/reset-password` consumes that token, changes the password, and revokes all existing access tokens. `EXPOSE_AUTH_ACTION_TOKENS=1` is available only for controlled local development and is disabled by default.
+
 Register and log in:
 
 ```powershell
@@ -75,6 +89,6 @@ The gateway accepts `POST /v1/summarize` with `account_id`, `request_id`, `promp
 
 The generic HMAC endpoint remains available at other `/v1/webhooks/<provider>` paths for already-verified self-hosted adapters and local tests. It is not a substitute for provider-specific verification.
 
-The service applies a small per-process, per-IP rate limit to API, authentication, entitlement, and webhook requests and rejects JSON bodies larger than 1 MiB. A public deployment still needs an HTTPS reverse proxy, distributed rate limiting, a managed database backup, email verification, password reset, and a secrets manager. The included service is a reference implementation, not a complete hosted payment product.
+The service applies a small per-process, per-IP rate limit to API, authentication, entitlement, and webhook requests and rejects JSON bodies larger than 1 MiB. A public deployment still needs an HTTPS reverse proxy, distributed rate limiting, a managed database backup, a secrets manager, abuse monitoring, and production email deliverability controls. The included service is a reference implementation, not a complete hosted payment product.
 
 The service does not store Vault notes, raw webpages, transcripts, or AI API keys.
