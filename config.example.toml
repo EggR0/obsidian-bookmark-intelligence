@@ -50,3 +50,7 @@ endpoint = ""
 account_id = ""
 access_token_env = "BOOKMARK_INTELLIGENCE_ACCESS_TOKEN"
 timeout_seconds = 10
+
+[billing]
+# Optional public billing page. Leave empty while checkout is not deployed.
+url = ""

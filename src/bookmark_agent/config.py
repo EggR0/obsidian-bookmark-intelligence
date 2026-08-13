@@ -85,6 +85,11 @@ class EntitlementConfig:
 
 
 @dataclass(frozen=True)
+class BillingConfig:
+    url: str
+
+
+@dataclass(frozen=True)
 class AppConfig:
     database: DatabaseConfig
     obsidian: ObsidianConfig
@@ -97,6 +102,7 @@ class AppConfig:
     features: FeaturesConfig
     support: SupportConfig
     entitlements: EntitlementConfig
+    billing: BillingConfig
 
     @property
     def ollama(self) -> SummarizerConfig:
@@ -265,6 +271,9 @@ def load_config(path: Path) -> AppConfig:
             account_id=str(raw.get("entitlements", {}).get("account_id", "")).strip(),
             access_token_env=str(raw.get("entitlements", {}).get("access_token_env", "")).strip(),
             timeout_seconds=int(raw.get("entitlements", {}).get("timeout_seconds", 10)),
+        ),
+        billing=BillingConfig(
+            url=str(raw.get("billing", {}).get("url", "")).strip().rstrip("/"),
         ),
     )
 

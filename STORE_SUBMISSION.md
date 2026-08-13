@@ -32,7 +32,7 @@ Obsidian community plugins:
 
 1. Keep the plugin source in a public GitHub repository.
 2. Submit the repository through the Obsidian community plugins submission process.
-3. Confirm root `manifest.json` version `0.2.38` and exact release tag `0.2.38`.
+3. Confirm root `manifest.json` version `0.2.39` and exact release tag `0.2.39`.
 4. Complete review and wait for acceptance before claiming marketplace availability.
 
 Chrome Web Store:
@@ -63,7 +63,7 @@ The core real-time flow does not require an account or a hosted service. Use a d
 
 Windows test path:
 
-1. Download `bookmark-intelligence-windows.zip` from the `v0.2.38` GitHub release and extract it.
+1. Download `bookmark-intelligence-windows.zip` from the `v0.2.39` GitHub release and extract it.
 2. Install Ollama and make a small model available, for example `ollama pull qwen2.5:1.5b`. Larger models require more RAM/VRAM.
 3. Open PowerShell in the extracted directory and run `powershell -ExecutionPolicy Bypass -File .\install.ps1 -VaultPath C:\Temp\BookmarkIntelligenceReview -SkipOpen`.
 4. Load `outputs\chrome-extension` as an unpacked Chrome extension, or use the AMO-signed Firefox listing after publication. Before AMO signing, Firefox local testing uses `about:debugging` -> **This Firefox** -> **Load Temporary Add-on**.

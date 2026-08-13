@@ -2,7 +2,7 @@
 
 ## Current Availability
 
-The current release supports local Ollama summarization through the local agent. External AI API connections, hosted AI credits, paid plans, account login, and Pro bulk analysis are displayed as future UI only and are temporarily disabled. No payment is requested or processed in this release.
+The current release supports local Ollama summarization through the local agent. A Polar checkout page and entitlement server path are included, but production payment stays disabled until an operator configures a public HTTPS billing service, Polar products, credentials, and webhooks. External AI API connections and hosted AI credits remain unavailable.
 
 ### Desktop download selection
 
@@ -382,7 +382,7 @@ The release includes `outputs/obsidian-bookmark-intelligence-plugin.zip`. Copy `
 
 The plugin does not create a Vault index or move notes. Local Ollama summarization still requires hardware capable of running the selected model.
 
-Paid plans, payment checkout, account login, hosted API credits, and external AI providers are not implemented yet. The related UI is intentionally disabled.
+Paid checkout and account login are implemented in the optional billing service, but the related desktop controls stay disabled until a billing URL is configured. Hosted API credits and external AI providers are not implemented yet.
 
 ### Pro entitlement (not available yet)
 

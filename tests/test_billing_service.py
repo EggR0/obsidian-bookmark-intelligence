@@ -86,6 +86,16 @@ class BillingServiceTests(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertEqual(order["account_id"], registered["account_id"])
 
+    def test_billing_page_is_served(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.port)
+        connection.request("GET", "/billing")
+        response = connection.getresponse()
+        body = response.read().decode("utf-8")
+        connection.close()
+        self.assertEqual(response.status, 200)
+        self.assertIn("Create account", body)
+        self.assertIn("/v1/checkouts", body)
+
     def test_hosted_credit_consumption_is_idempotent(self) -> None:
         status, registered = self.request("POST", "/v1/auth/register", {"email": "credits@example.com", "password": "a-long-test-password"})
         self.assertEqual(status, 201)
@@ -253,6 +263,40 @@ class BillingServiceTests(unittest.TestCase):
         })
         self.assertFalse(result["duplicate"])
         self.assertEqual(service.entitlement(registered["account_id"], registered["access_token"])["plan"], "Solo")
+
+    def test_polar_checkout_creates_provider_session_and_order_mapping(self) -> None:
+        from server.billing_service import BillingService
+
+        service = BillingService(
+            Path(self.tempdir.name) / "checkout.sqlite3",
+            base64.b64encode(b"polar-secret").decode("ascii"),
+            public_base_url="https://billing.example.test",
+            polar_access_token="polar-token",
+            polar_product_ids={"Solo": "product-solo"},
+        )
+        registered = service.register("checkout@example.com", "a-long-test-password")
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps({"id": "checkout-123", "url": "https://polar.example/checkout-123"}).encode("utf-8")
+
+        with patch("server.billing_service.urlopen", return_value=FakeResponse()) as open_url:
+            result = service.create_polar_checkout(registered["access_token"], "Solo")
+
+        self.assertEqual(result["checkout_id"], "checkout-123")
+        self.assertEqual(result["checkout_url"], "https://polar.example/checkout-123")
+        request = open_url.call_args.args[0]
+        self.assertEqual(request.full_url, "https://api.polar.sh/v1/checkouts")
+        body = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(body["products"], ["product-solo"])
+        self.assertEqual(body["metadata"], {"account_id": registered["account_id"], "plan": "Solo"})
+        self.assertEqual(service._order("checkout-123")["account_id"], registered["account_id"])
 
 
 if __name__ == "__main__":

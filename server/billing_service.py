@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 import base64
 from email.message import EmailMessage
 import smtplib
+from urllib.error import HTTPError
 
 try:
     from .provider_adapters import normalize_polar, normalize_toss, verify_standard_webhook
@@ -83,7 +84,7 @@ class RateLimiter:
 
 
 class BillingService:
-    def __init__(self, database_path: Path, webhook_secret: str, toss_secret_key: str = "", smtp_settings: dict | None = None, require_email_verification: bool = False, public_base_url: str = "", expose_action_tokens: bool = False):
+    def __init__(self, database_path: Path, webhook_secret: str, toss_secret_key: str = "", smtp_settings: dict | None = None, require_email_verification: bool = False, public_base_url: str = "", expose_action_tokens: bool = False, polar_access_token: str = "", polar_api_base_url: str = "https://api.polar.sh", polar_product_ids: dict[str, str] | None = None):
         self.database_path = database_path
         self.webhook_secret = webhook_secret
         self.toss_secret_key = toss_secret_key
@@ -91,6 +92,9 @@ class BillingService:
         self.require_email_verification = require_email_verification
         self.public_base_url = public_base_url.rstrip("/")
         self.expose_action_tokens = expose_action_tokens
+        self.polar_access_token = polar_access_token.strip()
+        self.polar_api_base_url = polar_api_base_url.rstrip("/")
+        self.polar_product_ids = polar_product_ids or {}
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
@@ -510,6 +514,63 @@ class BillingService:
             )
         return {"order_id": order_id, "account_id": account_id, "plan": plan}
 
+    def create_polar_checkout(self, token: str | None, plan: str) -> dict:
+        account_id = self._account_for_token(token)
+        if not account_id:
+            raise PermissionError("Invalid access token")
+        if self._billing_account(account_id) != account_id:
+            raise ForbiddenError("Only the team owner can create checkout sessions")
+        if plan not in PLAN_FEATURES or plan == "Free":
+            raise ValueError("A paid plan is required")
+        if not self.polar_access_token:
+            raise ValueError("Polar checkout is not configured")
+        product_id = self.polar_product_ids.get(plan, "").strip()
+        if not product_id:
+            raise ValueError(f"Polar product ID is not configured for {plan}")
+        if not self.public_base_url:
+            raise ValueError("PUBLIC_BASE_URL is required for checkout")
+        with self._db() as connection:
+            account = connection.execute("SELECT email FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
+        if not account:
+            raise ValueError("Unknown account_id")
+        checkout_payload = {
+            "products": [product_id],
+            "metadata": {"account_id": account_id, "plan": plan},
+            "external_customer_id": account_id,
+            "customer_email": account["email"],
+            "success_url": f"{self.public_base_url}/billing?checkout_id={{CHECKOUT_ID}}",
+            "return_url": f"{self.public_base_url}/billing",
+            "locale": "en",
+        }
+        request = Request(
+            f"{self.polar_api_base_url}/v1/checkouts",
+            data=json.dumps(checkout_payload).encode("utf-8"),
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self.polar_access_token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urlopen(request, timeout=15) as response:
+                checkout = json.loads(response.read().decode("utf-8"))
+        except HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace")[:500]
+            raise ValueError(f"Polar checkout creation failed: {detail}") from error
+        except Exception as error:
+            raise ValueError("Polar checkout creation failed") from error
+        checkout_id = str(checkout.get("id") or "").strip()
+        checkout_url = str(checkout.get("url") or "").strip()
+        if not checkout_id or not checkout_url:
+            raise ValueError("Polar returned an invalid checkout session")
+        with self._db() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO payment_orders (order_id, account_id, plan, created_at) VALUES (?, ?, ?, ?)",
+                (checkout_id, account_id, plan, utc_now()),
+            )
+        return {"ok": True, "provider": "polar", "checkout_id": checkout_id, "checkout_url": checkout_url, "account_id": account_id, "plan": plan}
+
     def _order(self, order_id: str) -> sqlite3.Row | None:
         with self._db() as connection:
             return connection.execute("SELECT * FROM payment_orders WHERE order_id = ?", (order_id,)).fetchone()
@@ -682,6 +743,15 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
+    def _write_html(self, body: str) -> None:
+        encoded = body.encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(encoded)
+
     def _body(self) -> tuple[dict, bytes]:
         content_length = int(self.headers.get("Content-Length", "0"))
         if content_length > MAX_REQUEST_BYTES:
@@ -704,6 +774,13 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/health":
             self._write(HTTPStatus.OK, {"ok": True})
+            return
+        if parsed.path in {"/billing", "/billing/"}:
+            try:
+                page = (Path(__file__).with_name("billing.html")).read_text(encoding="utf-8")
+                self._write_html(page)
+            except OSError:
+                self._write(HTTPStatus.NOT_FOUND, {"ok": False, "error": "Billing page is unavailable"})
             return
         if parsed.path == "/v1/team/members":
             try:
@@ -762,6 +839,10 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
                 result = self.service.create_payment_order(self._bearer(), str(payload.get("order_id", "")), str(payload.get("plan", "")))
                 self._write(HTTPStatus.CREATED, result)
                 return
+            if self.path == "/v1/checkouts":
+                result = self.service.create_polar_checkout(self._bearer(), str(payload.get("plan", "")))
+                self._write(HTTPStatus.CREATED, result)
+                return
             if self.path == "/v1/team/members":
                 result = self.service.add_team_member(self._bearer(), str(payload.get("member_account_id", "")))
                 self._write(HTTPStatus.CREATED, result)
@@ -816,8 +897,8 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
         return
 
 
-def create_server(host: str, port: int, database_path: Path, webhook_secret: str, toss_secret_key: str = "", smtp_settings: dict | None = None, require_email_verification: bool = False, public_base_url: str = "", expose_action_tokens: bool = False) -> ThreadingHTTPServer:
-    service = BillingService(database_path, webhook_secret, toss_secret_key, smtp_settings, require_email_verification, public_base_url, expose_action_tokens)
+def create_server(host: str, port: int, database_path: Path, webhook_secret: str, toss_secret_key: str = "", smtp_settings: dict | None = None, require_email_verification: bool = False, public_base_url: str = "", expose_action_tokens: bool = False, polar_access_token: str = "", polar_api_base_url: str = "https://api.polar.sh", polar_product_ids: dict[str, str] | None = None) -> ThreadingHTTPServer:
+    service = BillingService(database_path, webhook_secret, toss_secret_key, smtp_settings, require_email_verification, public_base_url, expose_action_tokens, polar_access_token, polar_api_base_url, polar_product_ids)
 
     class Handler(BillingRequestHandler):
         pass
@@ -839,6 +920,8 @@ def main() -> int:
     parser.add_argument("--database", type=Path, default=Path(os.environ.get("BILLING_DATABASE", "billing.sqlite3")))
     parser.add_argument("--webhook-secret", default=os.environ.get("BOOKMARK_INTELLIGENCE_WEBHOOK_SECRET", ""))
     parser.add_argument("--toss-secret-key", default=os.environ.get("TOSS_SECRET_KEY", ""))
+    parser.add_argument("--polar-access-token", default=os.environ.get("POLAR_ACCESS_TOKEN", ""))
+    parser.add_argument("--polar-api-base-url", default=os.environ.get("POLAR_API_BASE_URL", "https://api.polar.sh"))
     parser.add_argument("--require-email-verification", action="store_true", default=os.environ.get("REQUIRE_EMAIL_VERIFICATION", "0") == "1")
     args = parser.parse_args()
     if not args.webhook_secret:
@@ -851,7 +934,11 @@ def main() -> int:
         "from": os.environ.get("SMTP_FROM", ""),
         "starttls": os.environ.get("SMTP_STARTTLS", "1") != "0",
     }
-    server = create_server(args.host, args.port, args.database, args.webhook_secret, args.toss_secret_key, smtp_settings, args.require_email_verification, os.environ.get("PUBLIC_BASE_URL", ""), os.environ.get("EXPOSE_AUTH_ACTION_TOKENS", "0") == "1")
+    polar_product_ids = {
+        plan: os.environ.get(f"POLAR_{plan.upper()}_PRODUCT_ID", "")
+        for plan in ("solo", "duo", "team", "enterprise")
+    }
+    server = create_server(args.host, args.port, args.database, args.webhook_secret, args.toss_secret_key, smtp_settings, args.require_email_verification, os.environ.get("PUBLIC_BASE_URL", ""), os.environ.get("EXPOSE_AUTH_ACTION_TOKENS", "0") == "1", args.polar_access_token, args.polar_api_base_url, polar_product_ids)
     print(f"Billing service listening on http://{args.host}:{args.port}", flush=True)
     try:
         server.serve_forever()

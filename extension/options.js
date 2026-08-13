@@ -66,12 +66,15 @@ function renderSettings(payload) {
   activityPollingEnabled.checked = Boolean(settings.activityPollingEnabled);
   pollInterval.value = String(settings.pollIntervalMinutes || 1);
   profileId.textContent = payload.profileId || "Unknown";
+  const billingUrl = String(payload.billing_url || "").trim();
+  const billingEnabled = /^https?:\/\//i.test(billingUrl);
+  purchaseButton.disabled = !billingEnabled;
+  purchaseButton.dataset.billingUrl = billingUrl;
+  saveEntitlementButton.disabled = !billingEnabled;
+  importExistingButton.disabled = !billingEnabled;
   for (const option of aiProviderSelect.options) {
     option.disabled = option.value !== "ollama";
   }
-  saveEntitlementButton.disabled = true;
-  purchaseButton.disabled = true;
-  importExistingButton.disabled = true;
 }
 
 function renderSupportLinks(links) {
@@ -297,6 +300,11 @@ saveEntitlementButton.addEventListener("click", () => {
   saveEntitlementSettings().catch((error) => {
     statusText.textContent = String(error && error.message ? error.message : error);
   });
+});
+
+purchaseButton.addEventListener("click", () => {
+  const billingUrl = purchaseButton.dataset.billingUrl;
+  if (billingUrl) api.tabs.create({ url: billingUrl });
 });
 
 async function importExistingBookmarks(dryRun) {

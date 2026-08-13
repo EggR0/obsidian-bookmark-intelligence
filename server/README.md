@@ -20,6 +20,18 @@ For Polar, use the base64-encoded signing secret shown by Polar. `TOSS_SECRET_KE
 $env:TOSS_SECRET_KEY = "test_sk_..."
 ```
 
+Polar checkout configuration:
+
+```powershell
+$env:POLAR_ACCESS_TOKEN = "polar_organization_access_token"
+$env:POLAR_SOLO_PRODUCT_ID = "polar_solo_product_uuid"
+$env:POLAR_DUO_PRODUCT_ID = "polar_duo_product_uuid"
+$env:POLAR_TEAM_PRODUCT_ID = "polar_team_product_uuid"
+$env:PUBLIC_BASE_URL = "https://billing.example.com"
+```
+
+The billing page is served at `/billing`. It registers or signs in an account, calls `POST /v1/checkouts`, and redirects the customer to the Polar Checkout Session URL. Polar metadata carries the account and plan into the resulting subscription; the verified Standard Webhook then activates the matching entitlement. Keep `POLAR_ACCESS_TOKEN` on the server only.
+
 Optional account email security can be enabled for a public deployment:
 
 ```powershell
@@ -52,9 +64,11 @@ The token is intentionally not written to the Vault, SQLite, extension storage, 
 
 Payment flow:
 
-1. The authenticated client creates an order with `POST /v1/orders` and receives an order mapping. The mapping keeps the payment provider's `orderId` tied to the Bookmark Intelligence account and selected plan.
-2. Polar events are accepted at `POST /v1/webhooks/polar` only after Standard Webhooks signature and timestamp verification. The Polar payload must carry `account_id` and `plan` in its metadata; the adapter normalizes subscription state.
+1. The authenticated client calls `POST /v1/checkouts` with a paid plan. The server creates a Polar Checkout Session with the server-only Polar access token and records the checkout ID to account and plan mapping.
+2. The customer completes payment at the returned Polar checkout URL. Polar events are accepted at `POST /v1/webhooks/polar` only after Standard Webhooks signature and timestamp verification. The Polar payload must carry `account_id` and `plan` in its metadata; the adapter normalizes subscription state.
 3. Toss `PAYMENT_STATUS_CHANGED` events are accepted at `POST /v1/webhooks/toss` only when the order is known and the server re-queries Toss with `TOSS_SECRET_KEY`. A raw Toss webhook is never treated as proof of payment.
+
+`POST /v1/orders` remains available for provider-specific order mappings such as Toss. Polar product IDs and payment credentials are empty by default, so checkout remains unavailable until the operator configures a real Polar organization.
 
 Hosted AI gateways can reserve usage with `POST /v1/usage/consume` using the user's bearer token and either a JSON `request_id` or `Idempotency-Key` header:
 
@@ -97,6 +111,6 @@ The gateway accepts `POST /v1/summarize` with `account_id`, `request_id`, `promp
 
 The generic HMAC endpoint remains available at other `/v1/webhooks/<provider>` paths for already-verified self-hosted adapters and local tests. It is not a substitute for provider-specific verification.
 
-The service applies a small per-process, per-IP rate limit to API, authentication, entitlement, and webhook requests and rejects JSON bodies larger than 1 MiB. A public deployment still needs an HTTPS reverse proxy, distributed rate limiting, a managed database backup, a secrets manager, abuse monitoring, and production email deliverability controls. The included service is a reference implementation, not a complete hosted payment product.
+The service applies a small per-process, per-IP rate limit to API, authentication, entitlement, and webhook requests and rejects JSON bodies larger than 1 MiB. A public deployment still needs an HTTPS reverse proxy, distributed rate limiting, a managed database backup, a secrets manager, abuse monitoring, and production email deliverability controls. The Polar checkout path is implemented, but production operation still requires those controls plus refund, cancellation, and provider webhook procedures.
 
 The service does not store Vault notes, raw webpages, transcripts, or AI API keys.

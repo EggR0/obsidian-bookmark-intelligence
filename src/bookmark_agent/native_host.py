@@ -97,6 +97,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
             "entitlement_endpoint": config.entitlements.endpoint,
             "account_id": config.entitlements.account_id,
             "access_token_env": config.entitlements.access_token_env,
+            "billing_url": config.billing.url,
             "runtime_settings_path": str(runtime_settings_path(config.obsidian.vault_path)),
             "plan": current_plan(config),
             "support_links": config.support.links,
@@ -174,6 +175,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
         "model": config.summarizer.model,
         "plan": current_plan(config),
         "support_links": config.support.links,
+        "billing_url": config.billing.url,
     }
 
 

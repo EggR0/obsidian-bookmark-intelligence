@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bookmark Intelligence billing</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 680px; margin: 40px auto; padding: 0 18px; color: #172033; }
+    section { border: 1px solid #d6dde8; padding: 18px; margin: 16px 0; border-radius: 8px; }
+    input, button { font: inherit; padding: 9px 10px; margin: 4px 0; }
+    input { width: min(100%, 360px); display: block; }
+    button { cursor: pointer; }
+    .plans { display: flex; flex-wrap: wrap; gap: 8px; }
+    #status { min-height: 1.5em; }
+  </style>
+</head>
+<body>
+  <h1>Bookmark Intelligence</h1>
+  <p>Sign in or create an account, then choose a plan. Payment is handled by Polar. The local agent receives Pro access only after the verified webhook is processed.</p>
+  <section>
+    <h2>Account</h2>
+    <input id="email" type="email" autocomplete="email" placeholder="Email">
+    <input id="password" type="password" autocomplete="current-password" placeholder="Password (12+ characters)">
+    <button id="register">Create account</button>
+    <button id="login">Sign in</button>
+  </section>
+  <section>
+    <h2>Choose a plan</h2>
+    <div class="plans">
+      <button data-plan="Solo">Solo</button>
+      <button data-plan="Duo">Duo</button>
+      <button data-plan="Team">Team</button>
+    </div>
+  </section>
+  <p id="status" role="status"></p>
+  <script>
+    const email = document.getElementById("email");
+    const password = document.getElementById("password");
+    const status = document.getElementById("status");
+    const setStatus = (value) => { status.textContent = value; };
+    const request = async (path, options = {}) => {
+      const response = await fetch(path, { headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Request failed");
+      return data;
+    };
+    const saveSession = (data) => {
+      sessionStorage.setItem("bookmark_account_id", data.account_id || "");
+      sessionStorage.setItem("bookmark_access_token", data.access_token || "");
+      setStatus("Signed in. Choose a plan to continue to checkout.");
+    };
+    document.getElementById("register").onclick = async () => {
+      try { saveSession(await request("/v1/auth/register", { method: "POST", body: JSON.stringify({ email: email.value, password: password.value }) })); }
+      catch (error) { setStatus(error.message); }
+    };
+    document.getElementById("login").onclick = async () => {
+      try { saveSession(await request("/v1/auth/login", { method: "POST", body: JSON.stringify({ email: email.value, password: password.value }) })); }
+      catch (error) { setStatus(error.message); }
+    };
+    document.querySelectorAll("[data-plan]").forEach((button) => button.onclick = async () => {
+      const token = sessionStorage.getItem("bookmark_access_token");
+      if (!token) { setStatus("Sign in before choosing a plan."); return; }
+      button.disabled = true;
+      try {
+        const checkout = await request("/v1/checkouts", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ plan: button.dataset.plan }) });
+        window.location.href = checkout.checkout_url;
+      } catch (error) { setStatus(error.message); button.disabled = false; }
+    });
+    const checkoutId = new URLSearchParams(location.search).get("checkout_id");
+    if (checkoutId) setStatus("Payment was submitted. Keep the worker connected while Polar sends the verified subscription webhook.");
+  </script>
+</body>
+</html>

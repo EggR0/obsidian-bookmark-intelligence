@@ -64,7 +64,7 @@
 
       <section>
         <h2>Pro account</h2>
-        <p class="notice">Paid plans, account login, and hosted API credits are not implemented yet. Pro features are temporarily unavailable.</p>
+        <p class="notice">Production payment is available only when an operator configures the public billing service. With no billing URL configured, Pro controls remain disabled. Hosted API credits and external AI providers are not available yet.</p>
         <label for="entitlement-endpoint-input">Entitlement endpoint</label>
         <input id="entitlement-endpoint-input" type="url" spellcheck="false">
         <label for="account-id-input">Account ID</label>
@@ -72,8 +72,8 @@
         <label for="access-token-env-input">Access token environment variable</label>
         <input id="access-token-env-input" type="text" spellcheck="false" autocomplete="off">
         <p class="hint">The access token itself is never stored here. Set it in the local worker environment.</p>
-        <button id="save-entitlement-button" type="button" disabled>Save Pro connection (준비 중)</button>
-        <button id="purchase-button" type="button" disabled>Purchase Pro (준비 중)</button>
+        <button id="save-entitlement-button" type="button">Save Pro connection</button>
+        <button id="purchase-button" type="button" disabled>Purchase Pro</button>
       </section>
 
       <section id="support-section" hidden>
@@ -84,10 +84,10 @@
 
       <section>
         <h2>Existing bookmarks</h2>
-        <p class="hint">Bulk analysis is planned as a paid feature and is temporarily unavailable. Preview does not queue or modify bookmarks.</p>
+        <p class="hint">Bulk analysis requires an active paid entitlement. It is enabled only when a billing URL is configured and the local worker has a valid entitlement token.</p>
         <div class="row">
           <button id="preview-existing-button" type="button" class="secondary">Preview existing bookmarks</button>
-          <button id="import-existing-button" type="button" disabled>Analyze existing bookmarks (준비 중)</button>
+          <button id="import-existing-button" type="button">Analyze existing bookmarks</button>
         </div>
       </section>
 

@@ -45,13 +45,13 @@ jobs:
           }
       - name: Create source bundle
         shell: pwsh
-        run: Compress-Archive -Path README.md,SPEC.md,STORE_SUBMISSION.md,MONETIZATION.md,OBSIDIAN_PLUGIN_SUBMISSION.md,manifest.json,main.js,styles.css,versions.json,config.example.toml,extension,obsidian-plugin,src,server,scripts,install.ps1,install.sh,pyproject.toml -DestinationPath outputs/bookmark-intelligence-source.zip
+        run: Compress-Archive -Path README.md,SPEC.md,STORE_SUBMISSION.md,MONETIZATION.md,OBSIDIAN_PLUGIN_SUBMISSION.md,manifest.json,main.js,styles.css,versions.json,config.example.toml,extension,obsidian-plugin,src,server,scripts,deploy,install.ps1,install.sh,pyproject.toml -DestinationPath outputs/bookmark-intelligence-source.zip
       - name: Create Windows install bundle
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path package/outputs | Out-Null
           Copy-Item README.md,SPEC.md,STORE_SUBMISSION.md,MONETIZATION.md,OBSIDIAN_PLUGIN_SUBMISSION.md,manifest.json,main.js,styles.css,versions.json,config.example.toml,install.ps1,install.sh,pyproject.toml -Destination package/
-          Copy-Item -Recurse extension,obsidian-plugin,src,server,scripts -Destination package/
+          Copy-Item -Recurse extension,obsidian-plugin,src,server,scripts,deploy -Destination package/
           Copy-Item outputs/bookmark-agent-native.exe,outputs/chrome-extension.zip,outputs/firefox-extension.xpi,outputs/obsidian-bookmark-intelligence-plugin.zip -Destination package/outputs/
           Compress-Archive -Path package/* -DestinationPath outputs/bookmark-intelligence-windows.zip
       - name: Create release checksums
