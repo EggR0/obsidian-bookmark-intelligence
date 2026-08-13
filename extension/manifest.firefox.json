@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bookmark Intelligence",
-  "version": "0.2.37",
+  "version": "0.2.38",
   "description": "Firefox bookmark summaries for Obsidian. Requires a local agent and hardware for Ollama or your selected AI model.",
   "homepage_url": "https://eggr0.github.io/obsidian-bookmark-intelligence/",
   "icons": {
@@ -28,7 +28,10 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "bookmark-intelligence@eggr0.github.io"
+      "id": "bookmark-intelligence@eggr0.github.io",
+      "data_collection_permissions": {
+        "required": ["bookmarksInfo"]
+      }
     }
   }
 }

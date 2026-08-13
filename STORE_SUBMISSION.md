@@ -16,6 +16,7 @@ It also produces an Obsidian community-plugin package. Obsidian publication stil
 - Local agent download button for the latest GitHub Release bundle selected for the user's desktop OS
 - Store-safe local-first design: no advertising and no daily quota in the local/Ollama path
 - Chrome listing assets: `store-assets/bookmark-intelligence-store-1280x800.png` and `store-assets/bookmark-intelligence-promo-440x280.png`
+- Firefox manifest declares the required `bookmarksInfo` data collection permission for AMO's built-in consent flow
 
 ### Listing graphics
 
@@ -146,6 +147,12 @@ Privacy summary:
 
 ```text
 Bookmark URLs and titles are sent only to the user's locally installed Native Messaging host. The extension does not send bookmark data to a hosted service. The local agent may fetch bookmarked webpages or YouTube metadata/captions to create summaries, according to the user's local configuration.
+```
+
+Firefox data collection declaration:
+
+```text
+Required: bookmarksInfo. The extension sends bookmark names, URLs, and folder information to the user's locally installed Native Messaging host for the primary bookmark-to-Obsidian function. It does not collect website content from pages through the extension, and it does not transmit data to a developer-operated remote service.
 ```
 
 Permissions explanation:

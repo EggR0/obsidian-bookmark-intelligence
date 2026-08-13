@@ -1,5 +1,9 @@
 # Bookmark Intelligence
 
+## Current Availability
+
+The current release supports local Ollama summarization through the local agent. External AI API connections, hosted AI credits, paid plans, account login, and Pro bulk analysis are displayed as future UI only and are temporarily disabled. No payment is requested or processed in this release.
+
 ### Desktop download selection
 
 The extension's **Get local agent** button chooses the latest Windows install ZIP on Windows and the source bundle on Linux/macOS. The source bundle contains `install.sh` and the platform-specific Native Messaging setup. An explicitly configured download URL is preserved.
@@ -378,7 +382,9 @@ The release includes `outputs/obsidian-bookmark-intelligence-plugin.zip`. Copy `
 
 The plugin does not create a Vault index or move notes. Local Ollama summarization still requires hardware capable of running the selected model.
 
-### Pro entitlement
+Paid plans, payment checkout, account login, hosted API credits, and external AI providers are not implemented yet. The related UI is intentionally disabled.
+
+### Pro entitlement (not available yet)
 
 결제 서비스가 준비되면 `[entitlements]`에 entitlement endpoint와 account ID를 지정하고 다음 명령으로 구독 상태를 갱신합니다.
 
