@@ -64,8 +64,8 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--mark-seen", action="store_true", help="Save current scan state without enqueueing old bookmarks")
 
     import_parser = subparsers.add_parser("import-bookmarks", help="Import existing browser bookmarks")
-    import_parser.add_argument("--mode", choices=["index", "summarize"], default="index")
-    import_parser.add_argument("--dry-run", action="store_true", help="Preview without writing index or enqueueing summaries")
+    import_parser.add_argument("--mode", choices=["summarize"], default="summarize")
+    import_parser.add_argument("--dry-run", action="store_true", help="Preview without enqueueing summaries")
     import_parser.add_argument("--browser", choices=["chrome", "firefox"], help="Filter scanned browser source")
     import_parser.add_argument("--profile", help="Filter profile name substring")
     import_parser.add_argument("--folder", help="Filter folder path/title substring")
