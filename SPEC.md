@@ -181,7 +181,7 @@ The default is browser notifications, not Windows desktop notifications. The ext
 
 ## Pro Backup Contract
 
-`backup --output file.zip` creates a versioned ZIP containing `manifest.json`, a SQLite snapshot, and approved app-state files. It never archives the configured Vault directory. `restore --input file.zip` validates the format and Vault identity before replacing the local SQLite snapshot and approved state files. The worker should be stopped during restore.
+`backup --output file.zip` creates a versioned ZIP containing `manifest.json`, a SQLite snapshot, the summary prompt, AI connection settings, and approved app-state files. It never archives the configured Vault directory or API key values. `restore --input file.zip` validates the format and Vault identity before replacing the local SQLite snapshot and approved state files. The worker should be stopped during restore.
 
 `duplicate-report` groups bookmarks by canonical URL and returns the browser/profile/folder locations. It is read-only and never deletes or moves bookmarks.
 

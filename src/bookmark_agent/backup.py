@@ -12,7 +12,7 @@ from .database import init_db
 
 
 ARCHIVE_VERSION = 1
-STATE_FILES = ("events.jsonl", "activity.jsonl", "last-result.json", "summary-prompt.txt")
+STATE_FILES = ("events.jsonl", "activity.jsonl", "last-result.json", "summary-prompt.txt", "agent-settings.json")
 
 
 def _timestamp() -> str:
