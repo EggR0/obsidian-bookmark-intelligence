@@ -109,6 +109,40 @@ class BillingServiceTests(unittest.TestCase):
         self.assertEqual(status, 402)
         self.assertFalse(insufficient["ok"])
 
+    def test_team_member_shares_owner_entitlement_and_credits(self) -> None:
+        status, owner = self.request("POST", "/v1/auth/register", {"email": "owner@example.com", "password": "a-long-test-password"})
+        self.assertEqual(status, 201)
+        status, member = self.request("POST", "/v1/auth/register", {"email": "member@example.com", "password": "a-long-test-password"})
+        self.assertEqual(status, 201)
+        webhook = {"event_id": "team-plan-1", "account_id": owner["account_id"], "plan": "Team", "status": "active", "expires_at": "2099-01-01T00:00:00Z"}
+        raw = json.dumps(webhook).encode("utf-8")
+        signature = hmac.new(b"test-webhook-secret", raw, hashlib.sha256).hexdigest()
+        status, _ = self.request("POST", "/v1/webhooks/polar", webhook, headers={"X-Bookmark-Intelligence-Signature": f"sha256={signature}"})
+        self.assertEqual(status, 200)
+
+        status, added = self.request(
+            "POST", "/v1/team/members", {"member_account_id": member["account_id"]},
+            headers={"Authorization": f"Bearer {owner['access_token']}"},
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(added["plan"], "Team")
+        status, member_entitlement = self.request(
+            "GET", f"/v1/entitlements/{member['account_id']}",
+            headers={"Authorization": f"Bearer {member['access_token']}"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(member_entitlement["plan"], "Team")
+        self.assertEqual(member_entitlement["owner_account_id"], owner["account_id"])
+        status, consumed = self.request(
+            "POST", "/v1/usage/consume", {"units": 2, "request_id": "member-summary"},
+            headers={"Authorization": f"Bearer {member['access_token']}"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(consumed["remaining"], 798)
+        status, members = self.request("GET", "/v1/team/members", headers={"Authorization": f"Bearer {owner['access_token']}"})
+        self.assertEqual(status, 200)
+        self.assertEqual(len(members["members"]), 2)
+
     def test_standard_webhook_signature(self) -> None:
         secret = base64.b64encode(b"polar-secret").decode("ascii")
         body = b'{"type":"subscription.active"}'

@@ -42,6 +42,15 @@ Invoke-RestMethod http://127.0.0.1:8787/v1/usage/consume -Method Post -Headers @
 
 The operation requires an active paid plan, decrements `hosted_credits` atomically, and returns HTTP 402 when the balance is insufficient. Repeating the same request key does not charge twice. Local Ollama and user-owned provider API keys do not use this endpoint.
 
+Team plans share the owner's entitlement and hosted-credit balance. An owner can link an already registered account with `POST /v1/team/members`:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8787/v1/team/members -Method Post -Headers @{Authorization="Bearer <owner-token>"} -ContentType application/json -Body (@{member_account_id="acct_member"} | ConvertTo-Json)
+Invoke-RestMethod http://127.0.0.1:8787/v1/team/members -Headers @{Authorization="Bearer <owner-or-member-token>"}
+```
+
+Duo supports 2 total seats, Team supports 5 total seats, and Enterprise has no enforced seat cap in this reference service. A member uses their own login token, while the owner's subscription and shared credits are charged. `POST /v1/team/members/remove` removes a member. Production deployments should add email invitations, verification, audit logs, and organization administration before treating this as a complete enterprise identity system.
+
 Run the optional hosted gateway separately:
 
 ```powershell

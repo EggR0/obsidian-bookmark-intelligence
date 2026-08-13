@@ -30,10 +30,15 @@ PLAN_FEATURES = {
     "Enterprise": ["bulk_analysis", "duplicate_report", "backup", "restore"],
 }
 PLAN_CREDITS = {"Free": 0, "Solo": 300, "Duo": 500, "Team": 800, "Enterprise": 0}
+PLAN_SEATS = {"Free": 1, "Solo": 1, "Duo": 2, "Team": 5, "Enterprise": 1_000_000}
 MAX_REQUEST_BYTES = 1_048_576
 
 
 class InsufficientCreditsError(ValueError):
+    pass
+
+
+class ForbiddenError(Exception):
     pass
 
 
@@ -147,6 +152,14 @@ class BillingService:
                   PRIMARY KEY(account_id, request_id),
                   FOREIGN KEY(account_id) REFERENCES accounts(account_id)
                 );
+                CREATE TABLE IF NOT EXISTS team_memberships (
+                  owner_account_id TEXT NOT NULL,
+                  member_account_id TEXT NOT NULL UNIQUE,
+                  created_at TEXT NOT NULL,
+                  PRIMARY KEY(owner_account_id, member_account_id),
+                  FOREIGN KEY(owner_account_id) REFERENCES accounts(account_id),
+                  FOREIGN KEY(member_account_id) REFERENCES accounts(account_id)
+                );
                 """
             )
 
@@ -208,10 +221,87 @@ class BillingService:
             row = connection.execute("SELECT account_id FROM access_tokens WHERE token_hash = ?", (token_hash,)).fetchone()
         return row["account_id"] if row else None
 
+    def _billing_account(self, account_id: str) -> str:
+        with self._db() as connection:
+            row = connection.execute(
+                "SELECT owner_account_id FROM team_memberships WHERE member_account_id = ?",
+                (account_id,),
+            ).fetchone()
+        return row["owner_account_id"] if row else account_id
+
+    def add_team_member(self, token: str | None, member_account_id: str) -> dict:
+        owner_account_id = self._account_for_token(token)
+        if not owner_account_id:
+            raise PermissionError("Invalid access token")
+        member_account_id = member_account_id.strip()
+        if not member_account_id or member_account_id == owner_account_id:
+            raise ValueError("A different member_account_id is required")
+        with self._db() as connection:
+            owner_subscription = connection.execute(
+                "SELECT plan, status, expires_at FROM subscriptions WHERE account_id = ?",
+                (owner_account_id,),
+            ).fetchone()
+            if not owner_subscription or not _active(owner_subscription["status"], owner_subscription["expires_at"]):
+                raise ForbiddenError("An active Duo, Team, or Enterprise plan is required")
+            plan = owner_subscription["plan"]
+            if plan not in {"Duo", "Team", "Enterprise"}:
+                raise ForbiddenError("An active Duo, Team, or Enterprise plan is required")
+            if not connection.execute("SELECT 1 FROM accounts WHERE account_id = ?", (member_account_id,)).fetchone():
+                raise ValueError("Unknown member_account_id")
+            if connection.execute("SELECT 1 FROM team_memberships WHERE member_account_id = ?", (member_account_id,)).fetchone():
+                raise ValueError("The account already belongs to a team")
+            count = connection.execute(
+                "SELECT COUNT(*) AS count FROM team_memberships WHERE owner_account_id = ?",
+                (owner_account_id,),
+            ).fetchone()["count"]
+            if count + 1 >= PLAN_SEATS[plan]:
+                raise ForbiddenError(f"The {plan} plan supports {PLAN_SEATS[plan]} total seats")
+            connection.execute(
+                "INSERT INTO team_memberships (owner_account_id, member_account_id, created_at) VALUES (?, ?, ?)",
+                (owner_account_id, member_account_id, utc_now()),
+            )
+        return {"ok": True, "owner_account_id": owner_account_id, "member_account_id": member_account_id, "plan": plan}
+
+    def remove_team_member(self, token: str | None, member_account_id: str) -> dict:
+        owner_account_id = self._account_for_token(token)
+        if not owner_account_id:
+            raise PermissionError("Invalid access token")
+        with self._db() as connection:
+            deleted = connection.execute(
+                "DELETE FROM team_memberships WHERE owner_account_id = ? AND member_account_id = ?",
+                (owner_account_id, member_account_id.strip()),
+            ).rowcount
+        if not deleted:
+            raise ValueError("Team member was not found")
+        return {"ok": True, "owner_account_id": owner_account_id, "member_account_id": member_account_id.strip(), "removed": True}
+
+    def team_members(self, token: str | None) -> dict:
+        account_id = self._account_for_token(token)
+        if not account_id:
+            raise PermissionError("Invalid access token")
+        owner_account_id = self._billing_account(account_id)
+        with self._db() as connection:
+            subscription = connection.execute("SELECT plan FROM subscriptions WHERE account_id = ?", (owner_account_id,)).fetchone()
+            rows = connection.execute(
+                "SELECT member_account_id, created_at FROM team_memberships WHERE owner_account_id = ? ORDER BY created_at",
+                (owner_account_id,),
+            ).fetchall()
+        return {
+            "ok": True,
+            "owner_account_id": owner_account_id,
+            "account_id": account_id,
+            "plan": subscription["plan"] if subscription else "Free",
+            "members": [{"account_id": owner_account_id, "role": "owner"}] + [
+                {"account_id": row["member_account_id"], "role": "member", "created_at": row["created_at"]} for row in rows
+            ],
+        }
+
     def create_payment_order(self, token: str | None, order_id: str, plan: str) -> dict:
         account_id = self._account_for_token(token)
         if not account_id:
             raise PermissionError("Invalid access token")
+        if self._billing_account(account_id) != account_id:
+            raise ForbiddenError("Only the team owner can create payment orders")
         order_id = order_id.strip()
         if not order_id or plan not in PLAN_FEATURES or plan == "Free":
             raise ValueError("A non-Free plan and order_id are required")
@@ -245,13 +335,15 @@ class BillingService:
     def entitlement(self, account_id: str, token: str | None) -> dict:
         if self._account_for_token(token) != account_id:
             raise PermissionError("Invalid access token")
+        billing_account_id = self._billing_account(account_id)
         with self._db() as connection:
-            row = connection.execute("SELECT * FROM subscriptions WHERE account_id = ?", (account_id,)).fetchone()
+            row = connection.execute("SELECT * FROM subscriptions WHERE account_id = ?", (billing_account_id,)).fetchone()
         if not row or not _active(row["status"], row["expires_at"]):
             return {"account_id": account_id, "plan": "Free", "status": "inactive", "features": [], "hosted_credits": 0, "expires_at": None}
         plan = row["plan"] if row["plan"] in PLAN_FEATURES else "Free"
         return {
             "account_id": account_id,
+            "owner_account_id": billing_account_id,
             "plan": plan,
             "status": row["status"],
             "features": PLAN_FEATURES[plan],
@@ -260,12 +352,14 @@ class BillingService:
         }
 
     def consume_hosted_credits(self, token: str | None, request_id: str, units: int) -> dict:
-        account_id = self._account_for_token(token)
-        if not account_id:
+        member_account_id = self._account_for_token(token)
+        if not member_account_id:
             raise PermissionError("Invalid access token")
+        account_id = self._billing_account(member_account_id)
         request_id = request_id.strip()
         if not request_id or len(request_id) > 200:
             raise ValueError("A request_id is required and must be at most 200 characters")
+        request_id = f"{member_account_id}:{request_id}"
         if units <= 0 or units > 10_000:
             raise ValueError("units must be between 1 and 10000")
         with self._db() as connection:
@@ -413,6 +507,12 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
         if parsed.path == "/health":
             self._write(HTTPStatus.OK, {"ok": True})
             return
+        if parsed.path == "/v1/team/members":
+            try:
+                self._write(HTTPStatus.OK, self.service.team_members(self._bearer()))
+            except PermissionError as error:
+                self._write(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": str(error)})
+            return
         prefix = "/v1/entitlements/"
         if parsed.path.startswith(prefix):
             if not self._allow_request("entitlement", 120):
@@ -444,6 +544,14 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
                 result = self.service.create_payment_order(self._bearer(), str(payload.get("order_id", "")), str(payload.get("plan", "")))
                 self._write(HTTPStatus.CREATED, result)
                 return
+            if self.path == "/v1/team/members":
+                result = self.service.add_team_member(self._bearer(), str(payload.get("member_account_id", "")))
+                self._write(HTTPStatus.CREATED, result)
+                return
+            if self.path == "/v1/team/members/remove":
+                result = self.service.remove_team_member(self._bearer(), str(payload.get("member_account_id", "")))
+                self._write(HTTPStatus.OK, result)
+                return
             if self.path == "/v1/usage/consume":
                 request_id = str(payload.get("request_id") or self.headers.get("Idempotency-Key", ""))
                 result = self.service.consume_hosted_credits(self._bearer(), request_id, int(payload.get("units", 0)))
@@ -469,6 +577,8 @@ class BillingRequestHandler(BaseHTTPRequestHandler):
             self._write(HTTPStatus.NOT_FOUND, {"ok": False, "error": "Not found"})
         except PermissionError as error:
             self._write(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": str(error)})
+        except ForbiddenError as error:
+            self._write(HTTPStatus.FORBIDDEN, {"ok": False, "error": str(error)})
         except InsufficientCreditsError as error:
             self._write(HTTPStatus.PAYMENT_REQUIRED, {"ok": False, "error": str(error)})
         except (ValueError, json.JSONDecodeError) as error:
