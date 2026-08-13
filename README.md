@@ -1,5 +1,9 @@
 # Bookmark Intelligence
 
+### Desktop download selection
+
+The extension's **Get local agent** button chooses the latest Windows install ZIP on Windows and the source bundle on Linux/macOS. The source bundle contains `install.sh` and the platform-specific Native Messaging setup. An explicitly configured download URL is preserved.
+
 설치 페이지: [GitHub Pages](https://eggr0.github.io/obsidian-bookmark-intelligence/)
 
 GitHub Pages는 `site/`의 정적 설치 안내를 `main` 브랜치에 반영할 때 자동 배포합니다. 저장소 관리자 화면에서 Pages의 source를 `GitHub Actions`로 한 번 활성화해야 공개 URL이 동작합니다.

@@ -13,7 +13,7 @@ It also produces an Obsidian community-plugin package. Obsidian publication stil
 - Extension options page: `options.html`
 - Browser notifications: `notifications` and `alarms`
 - Native Messaging permission and local agent bridge
-- Local agent download button for the latest GitHub Release Windows bundle
+- Local agent download button for the latest GitHub Release bundle selected for the user's desktop OS
 - Store-safe local-first design: no advertising and no daily quota in the local/Ollama path
 
 ## What Still Requires Store Accounts
@@ -22,7 +22,7 @@ Obsidian community plugins:
 
 1. Keep the plugin source in a public GitHub repository.
 2. Submit the repository through the Obsidian community plugins submission process.
-3. Confirm root `manifest.json` version `0.2.29` and exact release tag `0.2.29`.
+3. Confirm root `manifest.json` version `0.2.34` and exact release tag `0.2.34`.
 4. Complete review and wait for acceptance before claiming marketplace availability.
 
 Chrome Web Store:
@@ -45,7 +45,7 @@ Firefox Add-ons:
 
 ## Important Native Messaging Note
 
-The browser extension cannot silently install or run the local Python/native agent from a web store listing. Users must install the local agent separately. This extension provides a `Get local agent` button that downloads the latest Windows bundle; the user then runs `install.ps1` once.
+The browser extension cannot silently install or run the local Python/native agent from a web store listing. Users must install the local agent separately. This extension provides a `Get local agent` button that downloads the latest Windows bundle on Windows or the source bundle on Linux/macOS; the user then runs the matching installer once.
 
 ## Public Privacy Policy URL
 

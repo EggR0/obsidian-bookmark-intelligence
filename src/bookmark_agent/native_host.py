@@ -6,7 +6,9 @@ import struct
 import sys
 
 from .bookmark_import import ImportFilters, import_bookmarks
+from . import __version__
 from .config import AppConfig, runtime_settings_path, save_runtime_settings
+from .database import connect, init_db
 from .entitlements import current_plan, has_feature
 from .service import ingest_bookmark_event
 from .summarizer import DEFAULT_SUMMARY_PROMPT, prompt_path, read_summary_prompt, write_summary_prompt
@@ -62,6 +64,18 @@ def _recent_activity(config: AppConfig, after: str | None = None, limit: int = 2
         "command": "recent-activity",
         "entries": entries[-max(1, min(limit, 100)) :],
     }
+
+
+def _queue_counts(config: AppConfig) -> dict[str, int]:
+    init_db(config.database.path)
+    with connect(config.database.path) as connection:
+        rows = connection.execute(
+            "SELECT process_status, COUNT(*) AS count FROM resources GROUP BY process_status"
+        ).fetchall()
+    counts = {"pending": 0, "processing": 0, "failed": 0, "succeeded": 0}
+    for row in rows:
+        counts[str(row["process_status"])] = int(row["count"])
+    return counts
 
 
 def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
@@ -148,8 +162,10 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
     return {
         "ok": True,
         "command": "ping",
+        "agent_version": __version__,
         "vault_path": str(config.obsidian.vault_path),
         "database_path": str(config.database.path),
+        "queue": _queue_counts(config),
         "notes_subdir": config.obsidian.notes_subdir,
         "provider": config.summarizer.provider,
         "model": config.summarizer.model,
