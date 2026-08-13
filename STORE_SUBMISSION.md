@@ -9,6 +9,7 @@ It also produces an Obsidian community-plugin package. Obsidian publication stil
 - Chrome extension ZIP: `outputs/chrome-extension.zip`
 - Firefox extension XPI: `outputs/firefox-extension.xpi`
 - Obsidian plugin ZIP: `outputs/obsidian-bookmark-intelligence-plugin.zip`
+- Obsidian plugin metadata: `obsidian-plugin/manifest.json` and `obsidian-plugin/versions.json`
 - Extension options page: `options.html`
 - Browser notifications: `notifications` and `alarms`
 - Native Messaging permission and local agent bridge
