@@ -133,7 +133,7 @@ Compact extracted metadata and summary: `resource_id`, `metadata_json`, `summary
 3. The agent records the event and upserts the canonical resource.
 4. The worker claims a pending or due-retry resource.
 5. Extraction runs.
-6. The selected AI provider summarizes the compact source text. The extension settings page can change the provider, model, base URL, and API-key environment variable name; the secret value remains an environment variable and is never stored by the extension.
+6. The selected AI provider summarizes the compact source text. The extension settings page can change the provider, model, base URL, API-key environment variable name, entitlement endpoint, account ID, and access-token environment variable name; secret values remain environment variables and are never stored by the extension.
 7. The worker writes `bookmark--<hash>.md`.
 8. The resource becomes `succeeded`, or `failed` with `retry_count`, `next_retry_at`, and `last_error`.
 

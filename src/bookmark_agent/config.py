@@ -138,7 +138,7 @@ def _read_runtime_settings(vault_path: Path) -> dict[str, str]:
 
 
 def save_runtime_settings(vault_path: Path, settings: dict[str, str]) -> Path:
-    allowed = {"provider", "model", "base_url", "api_key_env"}
+    allowed = {"provider", "model", "base_url", "api_key_env", "entitlement_endpoint", "account_id", "access_token_env"}
     unknown = set(settings) - allowed
     if unknown:
         raise ValueError(f"Unsupported runtime settings: {', '.join(sorted(unknown))}")
@@ -154,11 +154,26 @@ def save_runtime_settings(vault_path: Path, settings: dict[str, str]) -> Path:
     api_key_env = settings.get("api_key_env", "").strip()
     if api_key_env and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", api_key_env):
         raise ValueError("API key environment variable name is invalid")
+    entitlement_endpoint = settings.get("entitlement_endpoint", "").strip().rstrip("/")
+    if entitlement_endpoint and not entitlement_endpoint.startswith(("http://", "https://")):
+        raise ValueError("Entitlement endpoint must start with http:// or https://")
+    account_id = settings.get("account_id", "").strip()
+    access_token_env = settings.get("access_token_env", "").strip()
+    if access_token_env and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", access_token_env):
+        raise ValueError("Access token environment variable name is invalid")
     path = runtime_settings_path(vault_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(
-            {"provider": provider, "model": model, "base_url": base_url, "api_key_env": api_key_env},
+            {
+                "provider": provider,
+                "model": model,
+                "base_url": base_url,
+                "api_key_env": api_key_env,
+                "entitlement_endpoint": entitlement_endpoint,
+                "account_id": account_id,
+                "access_token_env": access_token_env,
+            },
             ensure_ascii=False,
             indent=2,
         )
@@ -263,6 +278,12 @@ def load_config(path: Path) -> AppConfig:
                 base_url=runtime.get("base_url", config.summarizer.base_url),
                 model=runtime.get("model", config.summarizer.model),
                 api_key_env=runtime.get("api_key_env", config.summarizer.api_key_env),
+            ),
+            entitlements=replace(
+                config.entitlements,
+                endpoint=runtime.get("entitlement_endpoint", config.entitlements.endpoint),
+                account_id=runtime.get("account_id", config.entitlements.account_id),
+                access_token_env=runtime.get("access_token_env", config.entitlements.access_token_env),
             ),
         )
     return config

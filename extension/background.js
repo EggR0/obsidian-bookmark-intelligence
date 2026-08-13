@@ -527,6 +527,9 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
     model: message.model,
     base_url: message.baseUrl,
     api_key_env: message.apiKeyEnv,
+    entitlement_endpoint: message.entitlementEndpoint,
+    account_id: message.accountId,
+    access_token_env: message.accessTokenEnv,
     ...(typeof message.summaryPrompt === "string" ? { summary_prompt: message.summaryPrompt } : {}),
     source: {
       browser: detectBrowser(),

@@ -518,7 +518,7 @@ notify_on_failure = true
 - polling 주기
 - 요약 입력 프롬프트
 
-확장 알림과 다운로드 URL 설정은 브라우저 extension storage에 저장됩니다. 요약 입력 프롬프트와 AI 공급자·모델·endpoint 설정은 Vault 밖 앱 데이터 폴더에 저장됩니다. 설정 페이지에서 Ollama, OpenAI 호환 API, Gemini, Anthropic, hosted gateway의 공급자·모델·endpoint와 API 키 환경 변수 이름을 바꿀 수 있습니다. API 키 값 자체는 저장하지 않습니다. 프롬프트에서는 `{{title}}`, `{{url}}`, `{{source_text}}` 변수를 사용할 수 있습니다.
+확장 알림과 다운로드 URL 설정은 브라우저 extension storage에 저장됩니다. 요약 입력 프롬프트, AI 연결, Pro entitlement 연결 설정은 Vault 밖 앱 데이터 폴더에 저장됩니다. 설정 페이지에서 Ollama, OpenAI 호환 API, Gemini, Anthropic, hosted gateway의 공급자·모델·endpoint와 API 키 환경 변수 이름, entitlement endpoint·account ID·access token 환경 변수 이름을 바꿀 수 있습니다. API 키와 access token 값 자체는 저장하지 않습니다. 프롬프트에서는 `{{title}}`, `{{url}}`, `{{source_text}}` 변수를 사용할 수 있습니다.
 
 ### 로컬 모델 하드웨어 요구사항
 

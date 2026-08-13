@@ -17,6 +17,9 @@ const aiProviderSelect = document.getElementById("ai-provider-select");
 const aiModelInput = document.getElementById("ai-model-input");
 const aiBaseUrlInput = document.getElementById("ai-base-url-input");
 const aiApiKeyEnvInput = document.getElementById("ai-api-key-env-input");
+const entitlementEndpointInput = document.getElementById("entitlement-endpoint-input");
+const accountIdInput = document.getElementById("account-id-input");
+const accessTokenEnvInput = document.getElementById("access-token-env-input");
 const plan = document.getElementById("plan");
 const supportSection = document.getElementById("support-section");
 const supportLinks = document.getElementById("support-links");
@@ -29,6 +32,7 @@ const pollButton = document.getElementById("poll-button");
 const savePromptButton = document.getElementById("save-prompt-button");
 const resetPromptButton = document.getElementById("reset-prompt-button");
 const saveAiButton = document.getElementById("save-ai-button");
+const saveEntitlementButton = document.getElementById("save-entitlement-button");
 const previewExistingButton = document.getElementById("preview-existing-button");
 const importExistingButton = document.getElementById("import-existing-button");
 
@@ -161,6 +165,9 @@ async function loadAgentSettings() {
   aiModelInput.value = response.model || "";
   aiBaseUrlInput.value = response.base_url || "";
   aiApiKeyEnvInput.value = response.api_key_env || "";
+  entitlementEndpointInput.value = response.entitlement_endpoint || "";
+  accountIdInput.value = response.account_id || "";
+  accessTokenEnvInput.value = response.access_token_env || "";
   plan.textContent = response.plan || plan.textContent;
   renderSupportLinks(response.support_links);
 }
@@ -202,6 +209,25 @@ async function saveAiSettings() {
     statusText.textContent = "AI connection saved.";
   } finally {
     saveAiButton.disabled = false;
+  }
+}
+
+async function saveEntitlementSettings() {
+  saveEntitlementButton.disabled = true;
+  statusText.textContent = "Saving Pro connection...";
+  try {
+    const response = await sendMessage({
+      type: "save-agent-settings",
+      entitlementEndpoint: entitlementEndpointInput.value.trim(),
+      accountId: accountIdInput.value.trim(),
+      accessTokenEnv: accessTokenEnvInput.value.trim()
+    });
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || "Could not save Pro connection");
+    }
+    statusText.textContent = "Pro connection saved.";
+  } finally {
+    saveEntitlementButton.disabled = false;
   }
 }
 
@@ -253,6 +279,12 @@ resetPromptButton.addEventListener("click", () => {
 
 saveAiButton.addEventListener("click", () => {
   saveAiSettings().catch((error) => {
+    statusText.textContent = String(error && error.message ? error.message : error);
+  });
+});
+
+saveEntitlementButton.addEventListener("click", () => {
+  saveEntitlementSettings().catch((error) => {
     statusText.textContent = String(error && error.message ? error.message : error);
   });
 });

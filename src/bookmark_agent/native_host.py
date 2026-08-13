@@ -77,6 +77,9 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
             "model": config.summarizer.model,
             "base_url": config.summarizer.base_url,
             "api_key_env": config.summarizer.api_key_env,
+            "entitlement_endpoint": config.entitlements.endpoint,
+            "account_id": config.entitlements.account_id,
+            "access_token_env": config.entitlements.access_token_env,
             "runtime_settings_path": str(runtime_settings_path(config.obsidian.vault_path)),
             "plan": current_plan(config),
             "support_links": config.support.links,
@@ -91,7 +94,7 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
             if not isinstance(prompt, str):
                 return {"ok": False, "error": "summary_prompt must be a string"}
             write_summary_prompt(config, prompt)
-        runtime_fields = {key: message[key] for key in ("provider", "model", "base_url", "api_key_env") if key in message}
+        runtime_fields = {key: message[key] for key in ("provider", "model", "base_url", "api_key_env", "entitlement_endpoint", "account_id", "access_token_env") if key in message}
         settings_path = None
         if runtime_fields:
             if not all(isinstance(value, str) for value in runtime_fields.values()):
@@ -103,6 +106,9 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
                     "model": config.summarizer.model,
                     "base_url": config.summarizer.base_url,
                     "api_key_env": config.summarizer.api_key_env,
+                    "entitlement_endpoint": config.entitlements.endpoint,
+                    "account_id": config.entitlements.account_id,
+                    "access_token_env": config.entitlements.access_token_env,
                     **runtime_fields,
                 },
             )

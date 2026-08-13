@@ -23,6 +23,9 @@ class RuntimeSettingsTests(unittest.TestCase):
                     "model": "gpt-test",
                     "base_url": "https://api.example.test/v1",
                     "api_key_env": "BOOKMARK_TEST_KEY",
+                    "entitlement_endpoint": "https://billing.example.test",
+                    "account_id": "acct-test",
+                    "access_token_env": "BOOKMARK_ACCESS_TOKEN",
                 },
             )
             self.assertEqual(path, runtime_settings_path(vault))
@@ -36,6 +39,9 @@ class RuntimeSettingsTests(unittest.TestCase):
             self.assertEqual(applied.summarizer.provider, "openai")
             self.assertEqual(applied.summarizer.model, "gpt-test")
             self.assertEqual(applied.summarizer.api_key_env, "BOOKMARK_TEST_KEY")
+            self.assertEqual(applied.entitlements.endpoint, "https://billing.example.test")
+            self.assertEqual(applied.entitlements.account_id, "acct-test")
+            self.assertEqual(applied.entitlements.access_token_env, "BOOKMARK_ACCESS_TOKEN")
             self.assertNotIn("secret", path.read_text(encoding="utf-8"))
 
     def test_ai_settings_save_does_not_clear_summary_prompt(self) -> None:
