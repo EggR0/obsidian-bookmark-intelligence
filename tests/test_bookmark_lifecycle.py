@@ -73,6 +73,22 @@ class BookmarkLifecycleTests(unittest.TestCase):
             self.assertEqual(len(list((vault / "Bookmarks").glob("*.md"))), 1)
             self.assertIn("# New title", second.read_text(encoding="utf-8"))
 
+    def test_markdown_escapes_yaml_strings_and_flattens_heading(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            vault = Path(directory) / "vault"
+            config = replace(self.config, obsidian=replace(self.config.obsidian, vault_path=vault))
+            note = write_obsidian_note(
+                config,
+                title='A "quoted" title\nwith a line break',
+                url="https://example.com/article?x=1&y=2",
+                canonical_url="https://example.com/article?x=1&y=2",
+                resource_type="webpage",
+                summary="Summary",
+            )
+            content = note.read_text(encoding="utf-8")
+            self.assertIn('source_url: "https://example.com/article?x=1&y=2"', content)
+            self.assertIn('# A "quoted" title with a line break', content)
+
 
 if __name__ == "__main__":
     unittest.main()

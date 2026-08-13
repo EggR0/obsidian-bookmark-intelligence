@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 import hashlib
+import json
 import re
 
 from .config import AppConfig
@@ -17,6 +18,10 @@ def slugify_title(title: str, fallback: str = "bookmark") -> str:
     if not cleaned:
         cleaned = fallback
     return cleaned[:120].rstrip(". ")
+
+
+def _yaml_string(value: str) -> str:
+    return json.dumps(value or "", ensure_ascii=False)
 
 
 def write_obsidian_note(
@@ -37,14 +42,15 @@ def write_obsidian_note(
     path = notes_dir / f"bookmark--{url_hash}.md"
 
     processed_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    safe_title = " ".join((title or "bookmark").splitlines()).strip() or "bookmark"
     content = f"""---
-source_url: "{url}"
-canonical_url: "{canonical_url}"
-resource_type: "{resource_type}"
-processed_at: "{processed_at}"
+source_url: {_yaml_string(url)}
+canonical_url: {_yaml_string(canonical_url)}
+resource_type: {_yaml_string(resource_type)}
+processed_at: {_yaml_string(processed_at)}
 ---
 
-# {title}
+# {safe_title}
 
 {summary}
 """
