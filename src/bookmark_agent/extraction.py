@@ -72,8 +72,9 @@ def _strip_caption_text(raw: str) -> str:
 def _download_caption(info: dict, preferred_languages: tuple[str, ...] = ("ko", "en")) -> tuple[str | None, str]:
     caption_sources = info.get("subtitles") or {}
     automatic_sources = info.get("automatic_captions") or {}
+    available_languages = list(dict.fromkeys([*preferred_languages, *caption_sources.keys(), *automatic_sources.keys()]))
 
-    for language in preferred_languages:
+    for language in available_languages:
         for source in (caption_sources, automatic_sources):
             entries = source.get(language) or []
             vtt_entry = next((entry for entry in entries if entry.get("ext") == "vtt"), None)
