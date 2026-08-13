@@ -606,6 +606,8 @@ Windows에서는 `install.ps1`로 대부분의 설치 과정을 한 번에 실�
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -VaultPath D:\obsidian
 ```
 
+Windows Release ZIP에는 Native Messaging 실행 파일이 함께 들어 있으므로 기본 설치는 이를 그대로 사용합니다. 소스에서 Native Host를 다시 빌드해야 할 때만 `-RebuildNativeHost`를 추가합니다.
+
 이 스크립트가 처리하는 일은 다음과 같습니다.
 
 - Python 가상환경 생성 또는 재사용
