@@ -1,0 +1,8 @@
+.obi-settings p {
+  color: var(--text-muted);
+  max-width: 760px;
+}
+
+.obi-settings input[type="text"] {
+  min-width: 360px;
+}
