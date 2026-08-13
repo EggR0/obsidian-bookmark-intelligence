@@ -9,7 +9,7 @@ It also produces an Obsidian community-plugin package. Obsidian publication stil
 - Chrome extension ZIP: `outputs/chrome-extension.zip`
 - Firefox extension XPI: `outputs/firefox-extension.xpi`
 - Obsidian plugin ZIP: `outputs/obsidian-bookmark-intelligence-plugin.zip`
-- Obsidian plugin metadata: `obsidian-plugin/manifest.json` and `obsidian-plugin/versions.json`
+- Obsidian community-plugin metadata: root `manifest.json` and `versions.json`
 - Extension options page: `options.html`
 - Browser notifications: `notifications` and `alarms`
 - Native Messaging permission and local agent bridge
@@ -22,7 +22,8 @@ Obsidian community plugins:
 
 1. Keep the plugin source in a public GitHub repository.
 2. Submit the repository through the Obsidian community plugins submission process.
-3. Complete review and wait for acceptance before claiming marketplace availability.
+3. Confirm root `manifest.json` version `0.2.25` and exact release tag `0.2.25`.
+4. Complete review and wait for acceptance before claiming marketplace availability.
 
 Chrome Web Store:
 
@@ -43,6 +44,14 @@ Firefox Add-ons:
 ## Important Native Messaging Note
 
 The browser extension cannot silently install or run the local Python/native agent from a web store listing. Users must install the local agent separately. This extension provides a `Get local agent` button that downloads the latest Windows bundle; the user then runs `install.ps1` once.
+
+## Public Privacy Policy URL
+
+Use the following public URL in Chrome Web Store and Firefox Add-ons privacy fields:
+
+```text
+https://eggr0.github.io/obsidian-bookmark-intelligence/privacy.html
+```
 
 ## Hardware Requirements Disclosure
 
