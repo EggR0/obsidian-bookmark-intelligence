@@ -48,7 +48,7 @@ Then reload Obsidian and enable the plugin in Settings -> Community plugins.
 - `manifest.json` uses plugin id `bookmark-intelligence`.
 - `manifest.json` version is `0.2.25`.
 - GitHub release tag `0.2.25` must contain `main.js`, `manifest.json`, and `styles.css`.
-- The browser/native-agent release tag `v0.2.24` remains separate from the Obsidian plugin release.
+- The browser/native-agent release tag `v0.2.25` remains separate from the Obsidian plugin release.
 
 ## Community Directory Submission
 
