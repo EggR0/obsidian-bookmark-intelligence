@@ -600,6 +600,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\update-release.ps1 -VaultPath
 VAULT_PATH="$HOME/Obsidian" SKIP_OPEN=1 ./scripts/update-release.sh
 ```
 
+The release updater verifies `SHA256SUMS.txt` before replacing the project files. It preserves an existing `config.toml` and Vault Markdown, then runs the installer so the Native Messaging manifests point to the persistent installation directory. On Linux, `install.sh` registers a user systemd service when available and otherwise creates an XDG autostart entry. On macOS, it registers a LaunchAgent. Use `SKIP_START_WORKER=1` when the worker should not be started or registered during an update.
+
 이 updater는 GitHub의 `latest` Windows/source Release asset과 `SHA256SUMS.txt`를 내려받아 SHA-256을 검증한 뒤 현재 설치 디렉터리에 반영하고 설치합니다. 따라서 Native Messaging manifest가 임시 폴더를 가리키지 않으며, 기존 `config.toml`과 Vault Markdown도 보존됩니다. 브라우저 스토어 확장은 각 스토어의 심사·게시 후 스토어 자동 업데이트 정책을 따릅니다. 설치 중 실행 중인 worker는 기존 프로세스가 계속 실행될 수 있으므로, 업데이트 후 worker를 한 번 재시작하는 것이 권장됩니다.
 
 태그가 GitHub Release로 배포되면 Release에는 Chrome ZIP, Firefox XPI, Windows Native Host, 소스 번들이 함께 올라갑니다. 브라우저 스토어 자동 업데이트는 각 스토어 심사와 게시가 완료된 뒤 스토어 정책에 따라 동작합니다.
