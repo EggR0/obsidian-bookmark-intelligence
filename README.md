@@ -429,6 +429,8 @@ bookmark-agent --config .\config.toml restore --input .\bookmark-intelligence-st
 
 무료 설치에서는 두 명령이 Pro 안내와 함께 종료됩니다. 복원 중에는 worker를 중지해야 하며, 복원 대상 Vault와 백업의 Vault 식별자가 다르면 거부됩니다.
 
+결제·로그인 entitlement 서버의 최소 구현은 `server/billing_service.py`에 있습니다. 계정 등록/로그인, bearer token, Polar/Toss용 정규화 webhook, HMAC 서명 검증, 중복 이벤트 차단을 제공합니다. 실제 공개 서비스로 운영할 때는 HTTPS reverse proxy, rate limiting, email verification, password reset, managed database, secret manager를 추가해야 합니다. 상세 실행법은 [`server/README.md`](server/README.md)를 참조합니다.
+
 모델이 없다면 먼저 내려받습니다.
 
 ```powershell

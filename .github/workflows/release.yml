@@ -30,13 +30,13 @@ jobs:
           scripts/native_host_launcher.py
       - name: Create source bundle
         shell: pwsh
-        run: Compress-Archive -Path README.md,SPEC.md,STORE_SUBMISSION.md,MONETIZATION.md,config.example.toml,extension,src,scripts,install.ps1,install.sh,pyproject.toml -DestinationPath outputs/bookmark-intelligence-source.zip
+        run: Compress-Archive -Path README.md,SPEC.md,STORE_SUBMISSION.md,MONETIZATION.md,config.example.toml,extension,src,server,scripts,install.ps1,install.sh,pyproject.toml -DestinationPath outputs/bookmark-intelligence-source.zip
       - name: Create Windows install bundle
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path package/outputs | Out-Null
           Copy-Item README.md,SPEC.md,STORE_SUBMISSION.md,MONETIZATION.md,config.example.toml,install.ps1,install.sh,pyproject.toml -Destination package/
-          Copy-Item -Recurse extension,src,scripts -Destination package/
+          Copy-Item -Recurse extension,src,server,scripts -Destination package/
           Copy-Item outputs/bookmark-agent-native.exe,outputs/chrome-extension.zip,outputs/firefox-extension.xpi -Destination package/outputs/
           Compress-Archive -Path package/* -DestinationPath outputs/bookmark-intelligence-windows.zip
       - name: Publish GitHub release

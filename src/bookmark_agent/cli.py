@@ -138,7 +138,10 @@ def main(argv: list[str] | None = None) -> int:
     config = load_config(config_path)
 
     if args.command == "refresh-entitlement":
-        print(json.dumps(refresh_entitlement(config), ensure_ascii=False, indent=2))
+        try:
+            print(json.dumps(refresh_entitlement(config), ensure_ascii=False, indent=2))
+        except ValueError as error:
+            raise SystemExit(f"Could not refresh entitlement: {error}") from error
         return 0
 
     feature_by_command = {
