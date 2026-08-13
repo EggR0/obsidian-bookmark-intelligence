@@ -16,6 +16,10 @@ It also produces an Obsidian community-plugin package. Obsidian publication stil
 - Local agent download button for the latest GitHub Release bundle selected for the user's desktop OS
 - Store-safe local-first design: no advertising and no daily quota in the local/Ollama path
 
+### Firefox signing status
+
+`outputs/firefox-extension.xpi` is the build/submission package and is not Mozilla-signed yet. Before AMO publication, regular Firefox users should use `about:debugging` -> **This Firefox** -> **Load Temporary Add-on** for local testing. After the AMO listing is approved, users should install from AMO so Firefox can handle signed updates. Do not describe the GitHub XPI as a normal permanent Firefox installation until it has been signed by AMO.
+
 ## What Still Requires Store Accounts
 
 Obsidian community plugins:
