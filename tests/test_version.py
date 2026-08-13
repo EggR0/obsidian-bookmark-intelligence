@@ -28,6 +28,12 @@ class VersionTests(unittest.TestCase):
         manifest = json.loads((root / "extension" / "manifest.firefox.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["browser_specific_settings"]["gecko"]["id"], "bookmark-intelligence@eggr0.github.io")
 
+    def test_extension_download_defaults_cover_all_desktop_platforms(self) -> None:
+        source = (Path(__file__).parents[1] / "extension" / "background.js").read_text(encoding="utf-8")
+        self.assertIn("bookmark-intelligence-windows.zip", source)
+        self.assertIn("bookmark-intelligence-source.zip", source)
+        self.assertIn("detectPlatform", source)
+
 
 if __name__ == "__main__":
     unittest.main()

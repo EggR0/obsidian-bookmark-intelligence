@@ -4,9 +4,11 @@ const api = globalThis.browser || globalThis.chrome;
 const isPromiseApi = Boolean(globalThis.browser);
 const storageArea = api.storage && api.storage.local;
 const ACTIVITY_ALARM = "bookmark-agent-activity-poll";
-const DEFAULT_AGENT_DOWNLOAD_URL = "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest/download/bookmark-intelligence-windows.zip";
+const RELEASE_DOWNLOAD_BASE = "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest/download/";
+const WINDOWS_AGENT_DOWNLOAD_URL = `${RELEASE_DOWNLOAD_BASE}bookmark-intelligence-windows.zip`;
+const SOURCE_AGENT_DOWNLOAD_URL = `${RELEASE_DOWNLOAD_BASE}bookmark-intelligence-source.zip`;
 const DEFAULT_SETTINGS = {
-  agentDownloadUrl: DEFAULT_AGENT_DOWNLOAD_URL,
+  agentDownloadUrl: "",
   notificationsEnabled: true,
   notifyQueued: true,
   notifySucceeded: true,
@@ -14,6 +16,18 @@ const DEFAULT_SETTINGS = {
   activityPollingEnabled: true,
   pollIntervalMinutes: 1
 };
+
+function detectPlatform() {
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (userAgent.includes("windows")) return "windows";
+  if (userAgent.includes("mac os") || userAgent.includes("macintosh")) return "macos";
+  if (userAgent.includes("linux")) return "linux";
+  return "unknown";
+}
+
+function defaultAgentDownloadUrl() {
+  return detectPlatform() === "windows" ? WINDOWS_AGENT_DOWNLOAD_URL : SOURCE_AGENT_DOWNLOAD_URL;
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -68,9 +82,14 @@ async function getProfileId() {
 
 async function getSettings() {
   const data = await getStorage(["settings"]);
+  const stored = (data && data.settings) || {};
   return {
     ...DEFAULT_SETTINGS,
-    ...((data && data.settings) || {})
+    ...stored,
+    // Migrate the old Windows-only default while preserving an explicit URL.
+    agentDownloadUrl: stored.agentDownloadUrl && stored.agentDownloadUrl !== WINDOWS_AGENT_DOWNLOAD_URL
+      ? stored.agentDownloadUrl
+      : defaultAgentDownloadUrl()
   };
 }
 
@@ -404,7 +423,7 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
   getSettings()
-    .then((settings) => downloadAgentPackage(settings.agentDownloadUrl || DEFAULT_AGENT_DOWNLOAD_URL))
+    .then((settings) => downloadAgentPackage(settings.agentDownloadUrl || defaultAgentDownloadUrl()))
     .then((downloadId) => {
       showNotification("Bookmark Intelligence", "Local agent package download started.");
       sendResponse({ ok: true, downloadId });
@@ -443,7 +462,7 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ok: true,
         settings,
         profileId,
-        defaultAgentDownloadUrl: DEFAULT_AGENT_DOWNLOAD_URL
+        defaultAgentDownloadUrl: defaultAgentDownloadUrl()
       });
     })
     .catch((error) => {
