@@ -56,6 +56,29 @@ Firefox Add-ons:
 
 The browser extension cannot silently install or run the local Python/native agent from a web store listing. Users must install the local agent separately. This extension provides a `Get local agent` button that downloads the latest Windows bundle on Windows or the source bundle on Linux/macOS; the user then runs the matching installer once.
 
+## Reviewer Test Instructions
+
+The core real-time flow does not require an account or a hosted service. Use a disposable Obsidian Vault and a test browser profile.
+
+Windows test path:
+
+1. Download `bookmark-intelligence-windows.zip` from the `v0.2.37` GitHub release and extract it.
+2. Install Ollama and make a small model available, for example `ollama pull qwen2.5:1.5b`. Larger models require more RAM/VRAM.
+3. Open PowerShell in the extracted directory and run `powershell -ExecutionPolicy Bypass -File .\install.ps1 -VaultPath C:\Temp\BookmarkIntelligenceReview -SkipOpen`.
+4. Load `outputs\chrome-extension` as an unpacked Chrome extension, or use the AMO-signed Firefox listing after publication. Before AMO signing, Firefox local testing uses `about:debugging` -> **This Firefox** -> **Load Temporary Add-on**.
+5. Open the extension popup, select **Test connection**, then create a disposable bookmark such as `https://example.com`.
+6. Confirm that the browser notification reports queue and completion activity and that one compact Markdown note appears in the configured Vault.
+
+The reviewer can also test failure behavior by stopping Ollama: the bookmark event remains captured, the worker records `processing_failed`, and the queue schedules a retry. Pro-only bulk analysis, duplicate reports, and backup/restore require a paid entitlement and are not needed to verify the free real-time path.
+
+Source reproduction:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[build]"
+python scripts\build_extensions.py
+```
+
 ## Public Privacy Policy URL
 
 Use the following public URL in Chrome Web Store and Firefox Add-ons privacy fields:
