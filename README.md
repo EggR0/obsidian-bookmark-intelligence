@@ -16,7 +16,7 @@ Chrome과 Firefox 북마크를 로컬에서 감지하고, 중복을 정리한 �
 
 Chrome과 Firefox에서 새 북마크를 감지하고 핵심 요약 노트를 Obsidian에 만드는 로컬 우선 도구입니다. 광고와 일일 사용량 제한 없이 Ollama 또는 사용자가 직접 연결한 AI API를 선택합니다.
 
-무료 핵심은 `새 북마크 -> 본문/자막 추출 -> 요약 -> Markdown 노트 1개`입니다. 기존 북마크 대량 분석, 고급 중복 검토, 앱 상태 백업과 로그인 기반 동기화는 별도 유료 Pro 기능으로 제공합니다.
+무료 핵심은 `새 북마크 -> 본문/자막 추출 -> 요약 -> Markdown 노트 1개`입니다. 기존 북마크 대량 분석, 고급 중복 검토, 앱 상태 백업과 로그인 기반 동기화는 향후 Pro 기능으로 계획되어 있지만 현재 제공하지 않습니다.
 
 백업 Pro 기능은 Vault의 Markdown, 원문, 자막, API 키를 복사하지 않습니다. 앱 데이터의 SQLite 큐, 중복/재시도 상태, 활동 기록, 사용자 프롬프트만 검증된 ZIP으로 저장하며, 복원 시 동일 Vault인지 확인합니다.
 
@@ -132,7 +132,7 @@ outputs\firefox-extension.xpi
 
 실시간 이벤트와 별도로, 기존 Chrome/Firefox 북마크를 한 번에 가져올 수 있습니다.
 
-기존 북마크 대량 분석은 Pro 기능입니다. Pro가 활성화된 설치에서는 SQLite 큐에 작업을 넣고, 중단 후에도 재시도 가능한 방식으로 순차 처리합니다.
+기존 북마크 대량 분석은 향후 Pro 기능으로 계획되어 있습니다. 현재 릴리스에서는 결제와 Pro entitlement가 구현되지 않아 사용자에게 제공하지 않습니다.
 
 고급 중복 정리는 자동 삭제가 아니라 여러 브라우저 프로필의 같은 canonical URL을 그룹으로 보여주는 Pro 보고서입니다.
 
@@ -158,9 +158,9 @@ bookmark-agent --config .\config.toml import-bookmarks --mode summarize --domain
 bookmark-agent --config .\config.toml import-bookmarks --mode summarize --folder AI --limit 100
 ```
 
-수천 개를 처리하는 동안 확장 프로그램 알림과 `activity.jsonl`에 큐 등록, 추출, 요약, 저장, 실패, 재시도 상태가 기록됩니다. 로컬 Ollama 또는 사용자가 직접 연결한 API는 일일 사용량 제한 없이 동작하지만, 외부 API는 해당 공급자의 요금과 한도를 따릅니다.
+수천 개를 처리하는 큐와 상태 기록은 내부 설계에 포함되어 있습니다. 현재 릴리스에서는 로컬 Ollama만 사용할 수 있으며, 외부 API와 Pro 대량 분석은 비활성화되어 있습니다.
 
-기존 북마크 대량 분석은 확장 프로그램 설정 페이지의 `Preview existing bookmarks`로 먼저 수량을 확인한 뒤 `Analyze existing bookmarks`로 전체 큐에 넣을 수 있습니다. 이 기능은 Pro entitlement가 필요하며, 북마크를 이동하거나 삭제하지 않습니다.
+기존 북마크 대량 분석은 확장 프로그램 설정 페이지에 향후 기능으로 표시되지만 현재 비활성화되어 있습니다. 미리보기만 북마크를 변경하지 않고 사용할 수 있습니다.
 
 ### URL 정규화와 중복 제거
 
@@ -350,7 +350,7 @@ Transcript unavailable; summarize from metadata and description.
 
 ### AI 공급자
 
-기본 공급자는 Ollama입니다. 외부 API를 선택하면 입력 본문이 해당 공급자로 전송됩니다.
+기본 공급자는 Ollama입니다. 외부 API 연결은 향후 기능으로 표시되지만 현재 비활성화되어 있습니다.
 
 ```toml
 [summarizer]
@@ -361,7 +361,7 @@ api_key_env = ""
 timeout_seconds = 120
 ```
 
-Ollama가 꺼져 있거나 모델이 없으면 작업은 실패로 기록되고 재시도 대상이 됩니다. OpenAI 호환 API는 `provider = "openai"`, Gemini는 `provider = "gemini"`, Anthropic은 `provider = "anthropic"`로 선택할 수 있습니다. 유료 hosted gateway를 사용할 때는 `provider = "hosted"`를 선택합니다.
+Ollama가 꺼져 있거나 모델이 없으면 작업은 실패로 기록되고 재시도 대상이 됩니다. OpenAI 호환 API, Gemini, Anthropic 및 유료 hosted gateway 연결은 아직 구현되지 않았습니다.
 
 ```toml
 [summarizer]
@@ -534,7 +534,7 @@ notify_on_failure = true
 - polling 주기
 - 요약 입력 프롬프트
 
-확장 알림과 다운로드 URL 설정은 브라우저 extension storage에 저장됩니다. 요약 입력 프롬프트, AI 연결, Pro entitlement 연결 설정은 Vault 밖 앱 데이터 폴더에 저장됩니다. 설정 페이지에서 Ollama, OpenAI 호환 API, Gemini, Anthropic, hosted gateway의 공급자·모델·endpoint와 API 키 환경 변수 이름, entitlement endpoint·account ID·access token 환경 변수 이름을 바꿀 수 있습니다. API 키와 access token 값 자체는 저장하지 않습니다. 프롬프트에서는 `{{title}}`, `{{url}}`, `{{source_text}}` 변수를 사용할 수 있습니다.
+확장 알림과 다운로드 URL 설정은 브라우저 extension storage에 저장됩니다. 요약 입력 프롬프트와 로컬 Ollama 설정은 Vault 밖 앱 데이터 폴더에 저장됩니다. 외부 API와 Pro entitlement 설정 UI는 향후 사용을 위해 표시되지만 현재 비활성화되어 있습니다. API 키와 access token 값 자체는 저장하지 않습니다. 프롬프트에서는 `{{title}}`, `{{url}}`, `{{source_text}}` 변수를 사용할 수 있습니다.
 
 ### 로컬 모델 하드웨어 요구사항
 
@@ -866,7 +866,7 @@ bookmark-agent --config .\config.toml worker
 - `notifications`와 `alarms`는 worker 활동 로그를 주기적으로 확인하고 브라우저 알림을 띄우는 데 사용합니다.
 - 확장 프로그램은 파일 시스템에 직접 접근하지 않습니다.
 - 로컬 에이전트는 Markdown만 설정된 Vault에 쓰고, 상태/큐/활동 로그는 Vault 밖 앱 데이터에 씁니다.
-- AI 호출은 기본적으로 localhost Ollama이며, 사용자가 설정한 외부 API도 지원합니다.
+- AI 호출은 현재 localhost Ollama만 지원합니다. 외부 API 연결은 아직 구현되지 않았습니다.
 - YouTube 영상 파일은 저장하지 않습니다.
 - 전체 웹페이지 아카이브를 저장하지 않습니다.
 - 사용자 알림은 기본적으로 Chrome/Firefox 확장 알림으로 표시됩니다.
@@ -911,7 +911,7 @@ Obsidian Community Plugin으로 등록되면 사용자는 Obsidian 안의 Commun
 
 ### 작업이 큐에 들어갔는지 확인하고 싶을 때
 
-실시간 북마크 이벤트는 앱 데이터 폴더의 SQLite `resources` 큐에 들어갑니다. 기존 북마크 대량 분석은 Pro 기능입니다. 사용자가 직접 DB를 열지 않아도 처리 시작과 결과는 브라우저 알림과 콘솔에서 확인할 수 있습니다.
+실시간 북마크 이벤트는 앱 데이터 폴더의 SQLite `resources` 큐에 들어갑니다. 기존 북마크 대량 분석은 향후 Pro 기능이며 현재 비활성화되어 있습니다. 사용자가 직접 DB를 열지 않아도 처리 시작과 결과는 브라우저 알림과 콘솔에서 확인할 수 있습니다.
 
 ```text
 %LOCALAPPDATA%\Bookmark Intelligence\<vault-id>\activity.jsonl
@@ -955,7 +955,7 @@ Ollama가 꺼져 있거나 모델 로드에 실패하면 해당 URL은 바로 �
 - YouTube 북마크 메타데이터 처리
 - Ollama 로컬 요약
 - `D:\obsidian\Bookmarks`에 Markdown 노트 생성
-- 기존 북마크 대량 분석은 Pro 큐로 제공
+- 기존 북마크 대량 분석은 향후 Pro 기능으로 제공 예정
 - 진단 명령 `doctor` 통과
 
 ## 라이선스
