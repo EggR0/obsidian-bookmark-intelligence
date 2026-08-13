@@ -40,7 +40,15 @@ Register and log in:
 Invoke-RestMethod http://127.0.0.1:8787/v1/auth/register -Method Post -ContentType application/json -Body (@{email="you@example.com";password="at-least-12-characters"} | ConvertTo-Json)
 ```
 
-The returned bearer token is configured for the local agent through `[entitlements]`.
+The login response contains `account_id` and a bearer `access_token`. Configure the endpoint, account ID, and token environment-variable name from the extension settings page, then set the token in the same user/session environment that starts the worker:
+
+```powershell
+$login = Invoke-RestMethod http://127.0.0.1:8787/v1/auth/login -Method Post -ContentType application/json -Body (@{email="you@example.com";password="at-least-12-characters"} | ConvertTo-Json)
+$env:BOOKMARK_INTELLIGENCE_ACCESS_TOKEN = $login.access_token
+bookmark-agent --config .\config.toml refresh-entitlement
+```
+
+The token is intentionally not written to the Vault, SQLite, extension storage, or the app settings file. Start the worker from the same process/session after setting it, or configure the environment variable through the operating system's user-level secret management. Do not place the token in a committed script or public repository.
 
 Payment flow:
 

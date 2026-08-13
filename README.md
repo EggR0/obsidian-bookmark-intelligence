@@ -441,6 +441,8 @@ bookmark-agent --config .\config.toml restore --input .\bookmark-intelligence-st
 
 결제·로그인 entitlement 서버의 최소 구현은 `server/billing_service.py`에 있습니다. 계정 등록/로그인, 선택적 이메일 인증·비밀번호 재설정, bearer token, 결제 주문 매핑, Polar Standard Webhooks 검증, Toss 결제 API 재조회, 중복 이벤트 차단, 기본 요청 rate limit을 제공합니다. 공개 운영에는 여전히 HTTPS reverse proxy, 분산 rate limiting, managed database, secret manager, 메일 발송 보안과 abuse monitoring이 필요합니다. 상세 실행법은 [`server/README.md`](server/README.md)를 참조합니다.
 
+로그인 후 발급된 access token은 확장 설정의 Pro 연결에 입력하지 않습니다. 설정 페이지에는 entitlement endpoint, account ID, token 환경 변수 이름만 저장하고, token 값은 worker를 시작하는 사용자 환경 변수에 둡니다. 자세한 PowerShell 로그인 예시는 [`server/README.md`](server/README.md)에 있습니다.
+
 모델이 없다면 먼저 내려받습니다.
 
 ```powershell
