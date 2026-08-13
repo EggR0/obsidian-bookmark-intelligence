@@ -22,7 +22,7 @@ Obsidian community plugins:
 
 1. Keep the plugin source in a public GitHub repository.
 2. Submit the repository through the Obsidian community plugins submission process.
-3. Confirm root `manifest.json` version `0.2.27` and exact release tag `0.2.27`.
+3. Confirm root `manifest.json` version `0.2.28` and exact release tag `0.2.28`.
 4. Complete review and wait for acceptance before claiming marketplace availability.
 
 Chrome Web Store:

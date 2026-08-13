@@ -14,7 +14,7 @@ from .config import AppConfig
 
 
 HOST_NAME = "obsidian_bookmark_agent"
-FIREFOX_EXTENSION_ID = "bookmark-to-obsidian@example.local"
+FIREFOX_EXTENSION_ID = "bookmark-intelligence@eggr0.github.io"
 
 
 @dataclass(frozen=True)
