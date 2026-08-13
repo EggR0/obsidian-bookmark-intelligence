@@ -398,9 +398,17 @@ function downloadAgentPackage(url) {
   if (!api.downloads || !api.downloads.download) {
     return Promise.reject(new Error("This browser does not expose the downloads API."));
   }
+  let filename = "bookmark-intelligence-download.zip";
+  try {
+    const pathname = new URL(url).pathname;
+    const candidate = pathname.split("/").pop();
+    if (candidate && /^[a-z0-9._-]+$/i.test(candidate)) filename = candidate;
+  } catch (error) {
+    console.warn("Could not determine download filename:", error);
+  }
   const options = {
     url,
-    filename: "bookmark-intelligence-windows.zip",
+    filename,
     saveAs: true
   };
   if (isPromiseApi) {

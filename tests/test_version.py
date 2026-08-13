@@ -33,6 +33,7 @@ class VersionTests(unittest.TestCase):
         self.assertIn("bookmark-intelligence-windows.zip", source)
         self.assertIn("bookmark-intelligence-source.zip", source)
         self.assertIn("detectPlatform", source)
+        self.assertIn("new URL(url).pathname", source)
 
 
 if __name__ == "__main__":

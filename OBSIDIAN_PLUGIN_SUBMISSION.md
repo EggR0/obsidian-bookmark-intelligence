@@ -19,7 +19,7 @@ For the version in `manifest.json`, the matching GitHub release must attach:
 Obsidian looks up the plugin version from the repository root `manifest.json`, then downloads the matching release assets for that exact version. The release tag must match the manifest version exactly. For this package, the Obsidian-compatible tag is:
 
 ```text
-0.2.30
+0.2.31
 ```
 
 Do not use a `v` prefix for the Obsidian community plugin release tag.
@@ -46,9 +46,9 @@ Then reload Obsidian and enable the plugin in Settings -> Community plugins.
 
 - Repository root contains `README.md`, `LICENSE`, `manifest.json`, and `versions.json`.
 - `manifest.json` uses plugin id `bookmark-intelligence`.
-- `manifest.json` version is `0.2.30`.
-- GitHub release tag `0.2.30` must contain `main.js`, `manifest.json`, and `styles.css`.
-- The browser/native-agent release tag `v0.2.30` remains separate from the Obsidian plugin release.
+- `manifest.json` version is `0.2.31`.
+- GitHub release tag `0.2.31` must contain `main.js`, `manifest.json`, and `styles.css`.
+- The browser/native-agent release tag `v0.2.31` remains separate from the Obsidian plugin release.
 
 ## Community Directory Submission
 
@@ -59,7 +59,7 @@ After the release exists and this repository is public:
 3. Add a new plugin from the Community Directory submission flow.
 4. Use repository `EggR0/obsidian-bookmark-intelligence`.
 5. Confirm that the directory sees root `manifest.json` from the default branch.
-6. Confirm that the release tag exactly matches `manifest.json` version: `0.2.30`.
+6. Confirm that the release tag exactly matches `manifest.json` version: `0.2.31`.
 7. Address any automated review feedback with a new commit and an incremented release version.
 
 Obsidian's current submission guide uses the Community Directory flow. The older `obsidianmd/obsidian-releases` pull request path is still useful as a reference for the plugin list format and download behavior.
