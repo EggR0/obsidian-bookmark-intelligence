@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from bookmark_agent.config import default_state_dir, load_config
-from bookmark_agent.entitlements import current_plan, has_feature, refresh_entitlement
+from bookmark_agent.entitlements import current_plan, entitlement_path, has_feature, refresh_entitlement, refresh_if_stale
 
 
 class EntitlementTests(unittest.TestCase):
@@ -59,6 +59,25 @@ class EntitlementTests(unittest.TestCase):
             cached = (default_state_dir(Path(directory)) / "entitlement.json").read_text(encoding="utf-8")
             self.assertNotIn("must-not-be-cached", cached)
             self.assertNotIn("secret", cached)
+
+    def test_refresh_if_stale_uses_cached_entitlement_when_server_is_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = replace(
+                self.base,
+                obsidian=replace(self.base.obsidian, vault_path=Path(directory)),
+                entitlements=replace(
+                    self.base.entitlements,
+                    endpoint="http://127.0.0.1:1",
+                    account_id="acct-1",
+                    access_token_env="MISSING_ACCESS_TOKEN",
+                ),
+            )
+            entitlement_path(config).write_text(
+                '{"account_id":"acct-1","plan":"Solo","status":"active","features":["bulk_analysis"],"refreshed_at":"2000-01-01T00:00:00Z"}',
+                encoding="utf-8",
+            )
+            self.assertEqual(refresh_if_stale(config)["plan"], "Solo")
+            self.assertTrue(has_feature(config, "bulk_analysis"))
 
 
 if __name__ == "__main__":

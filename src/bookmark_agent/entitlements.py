@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import json
 import os
 from pathlib import Path
@@ -13,6 +13,7 @@ from .vault_state import state_dir
 
 ENTITLEMENT_CACHE = "entitlement.json"
 PRO_FEATURES = {"bulk_analysis", "duplicate_report", "backup", "restore"}
+ENTITLEMENT_REFRESH_INTERVAL = timedelta(minutes=15)
 
 
 def entitlement_path(config: AppConfig) -> Path:
@@ -48,19 +49,33 @@ def _active(payload: dict) -> bool:
     return expires_at is None or expires_at > datetime.now(UTC)
 
 
+def refresh_if_stale(config: AppConfig) -> dict:
+    """Refresh configured remote entitlements without breaking offline cached access."""
+    cached = read_entitlement(config)
+    if not config.entitlements.endpoint or not config.entitlements.account_id or not config.entitlements.access_token_env:
+        return cached
+    refreshed_at = _parse_time(cached.get("refreshed_at"))
+    if refreshed_at and datetime.now(UTC) - refreshed_at < ENTITLEMENT_REFRESH_INTERVAL:
+        return cached
+    try:
+        return refresh_entitlement(config)
+    except (OSError, ValueError, requests.RequestException):
+        return cached
+
+
 def has_feature(config: AppConfig, feature: str) -> bool:
     if config.features.pro_enabled:
         return True
     if feature not in PRO_FEATURES:
         return False
-    payload = read_entitlement(config)
+    payload = refresh_if_stale(config)
     return _active(payload) and feature in set(payload.get("features") or [])
 
 
 def current_plan(config: AppConfig) -> str:
     if config.features.pro_enabled:
         return "Pro (development override)"
-    payload = read_entitlement(config)
+    payload = refresh_if_stale(config)
     return str(payload.get("plan") or "Free") if _active(payload) else "Free"
 
 
