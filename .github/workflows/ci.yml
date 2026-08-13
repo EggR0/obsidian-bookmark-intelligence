@@ -45,3 +45,10 @@ jobs:
           node --check extension/options.js
           node --check extension/popup.js
           node --check obsidian-plugin/main.js
+      - name: Check Unix installer syntax
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          bash -n install.sh
+          bash -n scripts/update.sh
+          bash -n scripts/update-release.sh
