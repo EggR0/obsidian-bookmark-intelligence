@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="options.css">
-    <title>Obsidian Bookmark Intelligence Settings</title>
+    <title>Bookmark Intelligence Settings</title>
   </head>
   <body>
     <main>
       <header>
-        <h1>Obsidian Bookmark Intelligence</h1>
+        <h1>Bookmark Intelligence</h1>
         <p id="status">Loading...</p>
       </header>
 
@@ -18,7 +18,7 @@
         <label for="agent-download-url">Download URL</label>
         <input id="agent-download-url" type="url" spellcheck="false">
         <div class="row">
-          <button id="open-download-button" type="button">Open download</button>
+          <button id="open-download-button" type="button">Download local agent</button>
           <button id="test-native-button" type="button" class="secondary">Test native host</button>
         </div>
         <dl>
@@ -27,14 +27,65 @@
             <dd id="vault-path">Unknown</dd>
           </div>
           <div>
-            <dt>Ollama model</dt>
-            <dd id="ollama-model">Unknown</dd>
+            <dt>Plan</dt>
+            <dd id="plan">Unknown</dd>
+            <dt>AI provider</dt>
+            <dd id="ai-provider">Unknown</dd>
+            <dt>AI model</dt>
+            <dd id="ai-model">Unknown</dd>
           </div>
           <div>
             <dt>Profile ID</dt>
             <dd id="profile-id">Unknown</dd>
           </div>
         </dl>
+      </section>
+
+      <section>
+        <h2>AI connection</h2>
+        <label for="ai-provider-select">Provider</label>
+        <select id="ai-provider-select">
+          <option value="ollama">Ollama</option>
+          <option value="openai">OpenAI-compatible</option>
+          <option value="gemini">Gemini</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="hosted">Bookmark Intelligence hosted</option>
+        </select>
+        <label for="ai-model-input">Model</label>
+        <input id="ai-model-input" type="text" spellcheck="false">
+        <label for="ai-base-url-input">Base URL</label>
+        <input id="ai-base-url-input" type="url" spellcheck="false">
+        <label for="ai-api-key-env-input">API key environment variable</label>
+        <input id="ai-api-key-env-input" type="text" spellcheck="false" autocomplete="off">
+        <p class="hint">The API key itself stays in the local process environment; it is never saved by the extension.</p>
+        <button id="save-ai-button" type="button">Save AI connection</button>
+      </section>
+
+      <section>
+        <h2>Pro account</h2>
+        <label for="entitlement-endpoint-input">Entitlement endpoint</label>
+        <input id="entitlement-endpoint-input" type="url" spellcheck="false">
+        <label for="account-id-input">Account ID</label>
+        <input id="account-id-input" type="text" spellcheck="false" autocomplete="off">
+        <label for="access-token-env-input">Access token environment variable</label>
+        <input id="access-token-env-input" type="text" spellcheck="false" autocomplete="off">
+        <p class="hint">The access token itself is never stored here. Set it in the local worker environment.</p>
+        <button id="save-entitlement-button" type="button">Save Pro connection</button>
+      </section>
+
+      <section id="support-section" hidden>
+        <h2>Support</h2>
+        <p class="hint">Only active support accounts configured by the product owner are shown.</p>
+        <div id="support-links" class="row"></div>
+      </section>
+
+      <section>
+        <h2>Existing bookmarks</h2>
+        <p class="hint">Bulk analysis is a paid feature. It queues existing Chrome or Firefox bookmarks without moving or deleting them.</p>
+        <div class="row">
+          <button id="preview-existing-button" type="button" class="secondary">Preview existing bookmarks</button>
+          <button id="import-existing-button" type="button">Analyze existing bookmarks</button>
+        </div>
       </section>
 
       <section>

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Obsidian Bookmark Intelligence",
-  "version": "0.1.0",
-  "description": "Send bookmark changes to a local Obsidian bookmark intelligence agent.",
+  "name": "Bookmark Intelligence",
+  "version": "0.2.24",
+  "description": "Summarize Chrome bookmarks into compact Obsidian Markdown notes with a local or user-configured AI provider.",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
@@ -13,10 +13,11 @@
     "bookmarks",
     "nativeMessaging",
     "notifications",
-    "storage"
+    "storage",
+    "downloads"
   ],
   "action": {
-    "default_title": "Obsidian Bookmark Intelligence",
+    "default_title": "Bookmark Intelligence",
     "default_icon": {
       "16": "icon16.png",
       "48": "icon48.png",

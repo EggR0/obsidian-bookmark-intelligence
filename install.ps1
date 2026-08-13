@@ -2,6 +2,7 @@ param(
   [string]$VaultPath = "D:\obsidian",
   [switch]$ForceConfig,
   [switch]$RegenerateChromeKey,
+  [switch]$RebuildNativeHost,
   [switch]$SkipOpen,
   [switch]$SkipStartWorker
 )
@@ -63,22 +64,27 @@ if (-not (Test-Path $ChromeExtensionIdPath)) {
 }
 $ChromeExtensionId = (Get-Content $ChromeExtensionIdPath -Raw).Trim()
 
-Write-Step "Building native host executable"
-Invoke-ProjectPython @(
-  "-m",
-  "PyInstaller",
-  "--onefile",
-  "--clean",
-  "--name",
-  "bookmark-agent-native",
-  "--distpath",
-  "outputs",
-  "--workpath",
-  "work\pyinstaller-build",
-  "--specpath",
-  "work\pyinstaller-spec",
-  "scripts\native_host_launcher.py"
-)
+if ((Test-Path ".\outputs\bookmark-agent-native.exe") -and -not $RebuildNativeHost) {
+  Write-Step "Using bundled native host executable"
+  Write-Host "Found .\outputs\bookmark-agent-native.exe. Pass -RebuildNativeHost to rebuild it from source."
+} else {
+  Write-Step "Building native host executable"
+  Invoke-ProjectPython @(
+    "-m",
+    "PyInstaller",
+    "--onefile",
+    "--clean",
+    "--name",
+    "bookmark-agent-native",
+    "--distpath",
+    "outputs",
+    "--workpath",
+    "work\pyinstaller-build",
+    "--specpath",
+    "work\pyinstaller-spec",
+    "scripts\native_host_launcher.py"
+  )
+}
 
 $NativeHostPath = (Resolve-Path ".\outputs\bookmark-agent-native.exe").Path
 

@@ -4,7 +4,7 @@ const api = globalThis.browser || globalThis.chrome;
 const isPromiseApi = Boolean(globalThis.browser);
 const storageArea = api.storage && api.storage.local;
 const ACTIVITY_ALARM = "bookmark-agent-activity-poll";
-const DEFAULT_AGENT_DOWNLOAD_URL = "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest";
+const DEFAULT_AGENT_DOWNLOAD_URL = "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest/download/bookmark-intelligence-windows.zip";
 const DEFAULT_SETTINGS = {
   agentDownloadUrl: DEFAULT_AGENT_DOWNLOAD_URL,
   notificationsEnabled: true,
@@ -375,45 +375,60 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+function downloadAgentPackage(url) {
+  if (!api.downloads || !api.downloads.download) {
+    return Promise.reject(new Error("This browser does not expose the downloads API."));
+  }
+  const options = {
+    url,
+    filename: "bookmark-intelligence-windows.zip",
+    saveAs: true
+  };
+  if (isPromiseApi) {
+    return api.downloads.download(options);
+  }
+  return new Promise((resolve, reject) => {
+    api.downloads.download(options, (downloadId) => {
+      const lastError = api.runtime.lastError;
+      if (lastError) {
+        reject(new Error(lastError.message));
+        return;
+      }
+      resolve(downloadId);
+    });
+  });
+}
+
 api.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.type !== "import-bookmarks-index") {
+  if (!message || message.type !== "download-agent") {
     return false;
   }
+  getSettings()
+    .then((settings) => downloadAgentPackage(settings.agentDownloadUrl || DEFAULT_AGENT_DOWNLOAD_URL))
+    .then((downloadId) => {
+      showNotification("Bookmark Intelligence", "Local agent package download started.");
+      sendResponse({ ok: true, downloadId });
+    })
+    .catch((error) => sendResponse({ ok: false, error: String(error && error.message ? error.message : error) }));
+  return true;
+});
 
+api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "import-existing-bookmarks") {
+    return false;
+  }
   withProfileId({
     schema_version: 1,
     command: "import-bookmarks",
-    mode: "index",
+    mode: "summarize",
+    all: true,
     dry_run: Boolean(message.dryRun),
-    source: {
-      browser: detectBrowser(),
-      extension: EXTENSION_NAME
-    },
-    event: {
-      type: "import-bookmarks",
-      timestamp: nowIso()
-    }
+    source: { browser: detectBrowser(), extension: EXTENSION_NAME },
+    event: { type: "import-bookmarks", timestamp: nowIso() }
   })
     .then(sendNativeRequest)
-    .then((response) => {
-      const status = {
-        ok: Boolean(response && response.ok),
-        checkedAt: nowIso(),
-        response: response || null
-      };
-      setLastStatus(status);
-      sendResponse(status);
-    })
-    .catch((error) => {
-      const status = {
-        ok: false,
-        checkedAt: nowIso(),
-        error: String(error && error.message ? error.message : error)
-      };
-      setLastStatus(status);
-      sendResponse(status);
-    });
-
+    .then((response) => sendResponse(response || { ok: false, error: "Empty native response" }))
+    .catch((error) => sendResponse({ ok: false, error: String(error && error.message ? error.message : error) }));
   return true;
 });
 
@@ -508,7 +523,14 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
   withProfileId({
     schema_version: 1,
     command: "save-agent-settings",
-    summary_prompt: message.summaryPrompt || "",
+    provider: message.provider,
+    model: message.model,
+    base_url: message.baseUrl,
+    api_key_env: message.apiKeyEnv,
+    entitlement_endpoint: message.entitlementEndpoint,
+    account_id: message.accountId,
+    access_token_env: message.accessTokenEnv,
+    ...(typeof message.summaryPrompt === "string" ? { summary_prompt: message.summaryPrompt } : {}),
     source: {
       browser: detectBrowser(),
       extension: EXTENSION_NAME

@@ -11,7 +11,18 @@ const activityPollingEnabled = document.getElementById("activity-polling-enabled
 const pollInterval = document.getElementById("poll-interval");
 const summaryPrompt = document.getElementById("summary-prompt");
 const vaultPath = document.getElementById("vault-path");
-const ollamaModel = document.getElementById("ollama-model");
+const aiProvider = document.getElementById("ai-provider");
+const aiModel = document.getElementById("ai-model");
+const aiProviderSelect = document.getElementById("ai-provider-select");
+const aiModelInput = document.getElementById("ai-model-input");
+const aiBaseUrlInput = document.getElementById("ai-base-url-input");
+const aiApiKeyEnvInput = document.getElementById("ai-api-key-env-input");
+const entitlementEndpointInput = document.getElementById("entitlement-endpoint-input");
+const accountIdInput = document.getElementById("account-id-input");
+const accessTokenEnvInput = document.getElementById("access-token-env-input");
+const plan = document.getElementById("plan");
+const supportSection = document.getElementById("support-section");
+const supportLinks = document.getElementById("support-links");
 const profileId = document.getElementById("profile-id");
 const promptPath = document.getElementById("prompt-path");
 const openDownloadButton = document.getElementById("open-download-button");
@@ -20,6 +31,10 @@ const saveButton = document.getElementById("save-button");
 const pollButton = document.getElementById("poll-button");
 const savePromptButton = document.getElementById("save-prompt-button");
 const resetPromptButton = document.getElementById("reset-prompt-button");
+const saveAiButton = document.getElementById("save-ai-button");
+const saveEntitlementButton = document.getElementById("save-entitlement-button");
+const previewExistingButton = document.getElementById("preview-existing-button");
+const importExistingButton = document.getElementById("import-existing-button");
 
 let defaultSummaryPrompt = "";
 
@@ -50,6 +65,31 @@ function renderSettings(payload) {
   activityPollingEnabled.checked = Boolean(settings.activityPollingEnabled);
   pollInterval.value = String(settings.pollIntervalMinutes || 1);
   profileId.textContent = payload.profileId || "Unknown";
+}
+
+function renderSupportLinks(links) {
+  supportLinks.replaceChildren();
+  const labels = {
+    github: "GitHub Sponsors",
+    polar: "Polar",
+    ko_fi: "Ko-fi",
+    buy_me_a_coffee: "Buy Me a Coffee",
+    patreon: "Patreon",
+    paypal: "PayPal",
+    toss: "Toss",
+    custom: "Support"
+  };
+  Object.entries(links || {}).forEach(([key, value]) => {
+    if (!/^https?:\/\//i.test(value)) return;
+    const link = document.createElement("a");
+    link.href = value;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = labels[key] || key;
+    link.className = "button secondary";
+    supportLinks.append(link);
+  });
+  supportSection.hidden = supportLinks.childElementCount === 0;
 }
 
 function collectSettings() {
@@ -101,7 +141,9 @@ async function testNativeHost() {
     }
     const response = status.response || {};
     vaultPath.textContent = response.vault_path || "Unknown";
-    ollamaModel.textContent = response.ollama_model || "Unknown";
+    aiProvider.textContent = response.provider || "Unknown";
+    aiModel.textContent = response.model || "Unknown";
+    plan.textContent = response.plan || "Free";
     statusText.textContent = "Native host connected.";
   } finally {
     testNativeButton.disabled = false;
@@ -117,7 +159,17 @@ async function loadAgentSettings() {
   defaultSummaryPrompt = response.default_summary_prompt || response.summary_prompt || "";
   promptPath.textContent = response.summary_prompt_path || "Unknown";
   vaultPath.textContent = response.vault_path || vaultPath.textContent;
-  ollamaModel.textContent = response.ollama_model || ollamaModel.textContent;
+  aiProvider.textContent = response.provider || aiProvider.textContent;
+  aiModel.textContent = response.model || aiModel.textContent;
+  aiProviderSelect.value = response.provider || aiProviderSelect.value;
+  aiModelInput.value = response.model || "";
+  aiBaseUrlInput.value = response.base_url || "";
+  aiApiKeyEnvInput.value = response.api_key_env || "";
+  entitlementEndpointInput.value = response.entitlement_endpoint || "";
+  accountIdInput.value = response.account_id || "";
+  accessTokenEnvInput.value = response.access_token_env || "";
+  plan.textContent = response.plan || plan.textContent;
+  renderSupportLinks(response.support_links);
 }
 
 async function saveSummaryPrompt() {
@@ -138,9 +190,58 @@ async function saveSummaryPrompt() {
   }
 }
 
+async function saveAiSettings() {
+  saveAiButton.disabled = true;
+  statusText.textContent = "Saving AI connection...";
+  try {
+    const response = await sendMessage({
+      type: "save-agent-settings",
+      provider: aiProviderSelect.value,
+      model: aiModelInput.value.trim(),
+      baseUrl: aiBaseUrlInput.value.trim(),
+      apiKeyEnv: aiApiKeyEnvInput.value.trim()
+    });
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || "Could not save AI connection");
+    }
+    aiProvider.textContent = aiProviderSelect.value;
+    aiModel.textContent = aiModelInput.value.trim();
+    statusText.textContent = "AI connection saved.";
+  } finally {
+    saveAiButton.disabled = false;
+  }
+}
+
+async function saveEntitlementSettings() {
+  saveEntitlementButton.disabled = true;
+  statusText.textContent = "Saving Pro connection...";
+  try {
+    const response = await sendMessage({
+      type: "save-agent-settings",
+      entitlementEndpoint: entitlementEndpointInput.value.trim(),
+      accountId: accountIdInput.value.trim(),
+      accessTokenEnv: accessTokenEnvInput.value.trim()
+    });
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || "Could not save Pro connection");
+    }
+    statusText.textContent = "Pro connection saved.";
+  } finally {
+    saveEntitlementButton.disabled = false;
+  }
+}
+
 openDownloadButton.addEventListener("click", () => {
-  const url = agentDownloadUrl.value.trim() || "https://github.com/EggR0/obsidian-bookmark-intelligence/releases/latest";
-  window.open(url, "_blank", "noopener,noreferrer");
+  sendMessage({ type: "download-agent" })
+    .then((response) => {
+      if (!response || !response.ok) {
+        throw new Error((response && response.error) || "Could not start local agent download");
+      }
+      statusText.textContent = "Local agent package download started.";
+    })
+    .catch((error) => {
+      statusText.textContent = String(error && error.message ? error.message : error);
+    });
 });
 
 testNativeButton.addEventListener("click", () => {
@@ -174,6 +275,48 @@ savePromptButton.addEventListener("click", () => {
 resetPromptButton.addEventListener("click", () => {
   summaryPrompt.value = defaultSummaryPrompt;
   statusText.textContent = "Default prompt restored in the editor. Save to apply.";
+});
+
+saveAiButton.addEventListener("click", () => {
+  saveAiSettings().catch((error) => {
+    statusText.textContent = String(error && error.message ? error.message : error);
+  });
+});
+
+saveEntitlementButton.addEventListener("click", () => {
+  saveEntitlementSettings().catch((error) => {
+    statusText.textContent = String(error && error.message ? error.message : error);
+  });
+});
+
+async function importExistingBookmarks(dryRun) {
+  const button = dryRun ? previewExistingButton : importExistingButton;
+  button.disabled = true;
+  statusText.textContent = dryRun ? "Scanning existing bookmarks..." : "Queuing existing bookmarks...";
+  try {
+    const response = await sendMessage({ type: "import-existing-bookmarks", dryRun });
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || "Could not process existing bookmarks");
+    }
+    const count = response.selected ?? response.queued ?? response.count;
+    statusText.textContent = dryRun
+      ? `Preview complete${count === undefined ? "." : `: ${count} bookmark(s) selected.`}`
+      : `Existing bookmarks queued${count === undefined ? "." : `: ${count} bookmark(s).`}`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+previewExistingButton.addEventListener("click", () => {
+  importExistingBookmarks(true).catch((error) => {
+    statusText.textContent = String(error && error.message ? error.message : error);
+  });
+});
+
+importExistingButton.addEventListener("click", () => {
+  importExistingBookmarks(false).catch((error) => {
+    statusText.textContent = String(error && error.message ? error.message : error);
+  });
 });
 
 loadSettings()

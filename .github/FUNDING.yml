@@ -1,0 +1,7 @@
+# Add real account names only after each service is activated.
+# github: USERNAME
+# ko_fi: USERNAME
+# buy_me_a_coffee: USERNAME
+# patreon: USERNAME
+# polar: USERNAME
+# custom: ["https://example.com/support"]

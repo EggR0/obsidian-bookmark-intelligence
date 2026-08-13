@@ -1,0 +1,47 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - "**"
+    tags-ignore:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install -e ".[test,build]"
+      - name: Prepare isolated test config
+        run: python scripts/prepare_ci_config.py
+      - name: Run Python tests
+        run: python -m pytest -q
+      - name: Compile Python modules
+        run: python -m compileall -q src server tests
+      - name: Build browser packages
+        run: python scripts/build_extensions.py
+      - name: Build Obsidian plugin package
+        run: python scripts/build_obsidian_plugin.py
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          node --check extension/background.js
+          node --check extension/options.js
+          node --check extension/popup.js
+          node --check obsidian-plugin/main.js

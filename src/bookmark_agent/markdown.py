@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+import hashlib
+import json
 import re
 
 from .config import AppConfig
@@ -18,6 +20,10 @@ def slugify_title(title: str, fallback: str = "bookmark") -> str:
     return cleaned[:120].rstrip(". ")
 
 
+def _yaml_string(value: str) -> str:
+    return json.dumps(value or "", ensure_ascii=False)
+
+
 def write_obsidian_note(
     config: AppConfig,
     *,
@@ -26,33 +32,25 @@ def write_obsidian_note(
     canonical_url: str,
     resource_type: str,
     summary: str,
-    recommended_folder: str,
-    recommended_tags: list[str],
 ) -> Path:
     vault = config.obsidian.vault_path
     notes_dir = vault / config.obsidian.notes_subdir
     notes_dir.mkdir(parents=True, exist_ok=True)
 
-    filename = f"{slugify_title(title)}.md"
-    path = notes_dir / filename
-    counter = 2
-    while path.exists():
-        path = notes_dir / f"{slugify_title(title)} {counter}.md"
-        counter += 1
+    # The URL hash keeps one bookmark mapped to one note even when its title changes.
+    url_hash = hashlib.sha256(canonical_url.encode("utf-8")).hexdigest()[:12]
+    path = notes_dir / f"bookmark--{url_hash}.md"
 
     processed_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    tags_yaml = "\n".join(f"  - {tag}" for tag in recommended_tags)
+    safe_title = " ".join((title or "bookmark").splitlines()).strip() or "bookmark"
     content = f"""---
-source_url: "{url}"
-canonical_url: "{canonical_url}"
-resource_type: "{resource_type}"
-processed_at: "{processed_at}"
-recommended_folder: "{recommended_folder}"
-tags:
-{tags_yaml}
+source_url: {_yaml_string(url)}
+canonical_url: {_yaml_string(canonical_url)}
+resource_type: {_yaml_string(resource_type)}
+processed_at: {_yaml_string(processed_at)}
 ---
 
-# {title}
+# {safe_title}
 
 {summary}
 """

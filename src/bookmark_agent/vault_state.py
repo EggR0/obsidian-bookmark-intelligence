@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 
-from .config import AppConfig
+from .config import AppConfig, default_state_dir
 from .database import utc_now
 
 
 def state_dir(config: AppConfig):
-    path = config.obsidian.vault_path / ".bookmark-agent"
+    path = default_state_dir(config.obsidian.vault_path)
     path.mkdir(parents=True, exist_ok=True)
     return path
 

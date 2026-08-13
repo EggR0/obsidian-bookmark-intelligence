@@ -1,101 +1,78 @@
-# Obsidian Bookmark Intelligence - SPEC
+# Bookmark Intelligence Specification
 
 ## Goal
 
-Chrome and Firefox bookmark changes are captured in near real time, normalized locally, summarized through Ollama, and written into an Obsidian vault as compact Markdown notes.
+Bookmark Intelligence detects Chrome and Firefox bookmark changes, deduplicates canonical URLs, extracts compact webpage or YouTube source data, summarizes it with a configured AI provider, and writes one concise Markdown note per URL into the configured Obsidian Vault.
 
-Obsidian is the final knowledge database. The local SQLite file is only an internal queue under the vault for dedupe, retry state, and event recovery.
+The free core is real-time bookmark processing. Existing-bookmark bulk analysis, advanced duplicate reports, and app-state backup/restore are Pro capabilities. The local Ollama and user-owned API-key paths do not impose an application daily quota.
 
 ## Non-Goals
 
-- Store videos, full webpages, screenshots, or browser history.
-- Use advertising-backed services, hosted bookmark managers, hosted summarization APIs, or quota-limited SaaS by default.
+- Store videos, full webpages, screenshots, browser history, or raw transcripts in Obsidian.
+- Create Vault index, inbox, activity, recommendation, or database folders.
 - Automatically move browser bookmarks by default.
-- Replace Obsidian as the user's final knowledge store.
-
-## Current Local Defaults
-
-```text
-Vault:          D:\obsidian
-Final notes:    D:\obsidian\Bookmarks
-Internal state: D:\obsidian\.bookmark-agent
-Queue DB:       D:\obsidian\.bookmark-agent\bookmark-agent.sqlite3
-Event log:      D:\obsidian\.bookmark-agent\events.jsonl
-Ollama model:   qwen2.5:7b
-```
+- Replace Obsidian as the human-readable final store.
 
 ## Architecture
 
 ```text
-Chrome / Firefox
-  WebExtension
-    bookmarks API events
-    native messaging
-        |
-        v
-Native host executable
-  canonical URL
-  event log in vault
-  processing queue in vault
-        |
-        v
-Worker
-  webpage extraction: trafilatura
-  YouTube metadata/subtitles: yt-dlp
-  summarization: local Ollama
-        |
-        v
-Obsidian vault
-  compact Markdown notes
+Chrome / Firefox WebExtension
+  -> Native Messaging
+  -> local Python agent
+  -> canonical URL + dedupe
+  -> SQLite queue in OS app data
+  -> worker
+  -> trafilatura or yt-dlp
+  -> Ollama / OpenAI-compatible / Gemini / Anthropic
+  -> one Markdown note in the configured Vault
 ```
+
+The extension observes bookmark events and displays browser notifications. It does not crawl pages, call AI providers, or write files.
+
+## Storage Boundary
+
+Only final summary notes are written to the Vault:
+
+```text
+D:\obsidian\Bookmarks\bookmark--<canonical-url-hash>.md
+```
+
+SQLite, event JSONL, retry state, and the editable prompt are stored outside the Vault:
+
+```text
+Windows: %LOCALAPPDATA%\Bookmark Intelligence\<vault-id>\
+macOS:   ~/Library/Application Support/Bookmark Intelligence/<vault-id>/
+Linux:   $XDG_STATE_HOME/Bookmark Intelligence/<vault-id>/
+```
+
+The configured Vault path is never hardcoded. `${state}` in `config.toml` resolves to the OS app-data directory.
 
 ## Component Responsibilities
 
 ### WebExtension
 
-- Runs in Chrome and Firefox from one shared JavaScript codebase.
-- Creates a local `profile_id` per extension installation so multiple Chrome/Firefox profiles do not collide.
-- Listens to:
-  - `bookmarks.onCreated`
-  - `bookmarks.onChanged`
-  - `bookmarks.onMoved`
-  - `bookmarks.onRemoved`
-- Sends small event payloads to the local native host.
-- Provides popup controls for Native Host connection testing, local agent download, and existing bookmark index creation.
-- Provides an options page for browser notification settings and activity polling interval.
-- Does not crawl webpages, call LLMs, or write files.
+- Uses one shared JavaScript codebase for Chrome and Firefox.
+- Stores a random `profile_id` per extension profile.
+- Listens to `bookmarks.onCreated`, `onChanged`, `onMoved`, and `onRemoved`.
+- Sends compact event payloads through Native Messaging.
+- Shows connection status, agent download, settings, and browser notifications.
+- Polls recent activity through the Native Host while the browser is running.
 
 ### Native Host
 
-- Receives browser events over Native Messaging.
-- Handles control commands: `ping`, `import-bookmarks`, and `recent-activity`.
-- Canonicalizes URLs.
-- Appends a human-inspectable event log to `D:\obsidian\.bookmark-agent\events.jsonl`.
-- Adds or updates queue state in `D:\obsidian\.bookmark-agent\bookmark-agent.sqlite3`.
-- Returns a compact response to the browser.
+- Receives bookmark events and control commands.
+- Canonicalizes URLs and inserts/upserts queue state.
+- Provides `ping`, `get-agent-settings`, `save-agent-settings`, `recent-activity`, and Pro-gated bulk import commands.
+- Never receives or stores provider API keys from extension storage.
 
 ### Worker
 
-- Reads due queue entries.
-- Extracts compact source data:
-  - General webpages: `trafilatura`.
-  - YouTube: `yt-dlp`, metadata and subtitle text only.
-- Calls Ollama on `localhost`.
-- Writes final Markdown into the configured Obsidian notes folder.
-- Records success, failure, retry count, and the generated Markdown path.
-
-## Why There Is SQLite
-
-SQLite is not the knowledge store. It is a local work queue because bookmark processing has state that Markdown alone handles awkwardly:
-
-- The same canonical URL may appear in multiple bookmarks.
-- Web extraction can fail.
-- YouTube captions may be unavailable or rate-limited by the source site.
-- Ollama may be stopped or missing the configured model.
-- Native Messaging host processes are short-lived.
-- Failed resources need retry state without duplicating final notes.
-
-Final readable knowledge remains Markdown in Obsidian.
+- Claims due queue entries in batches.
+- Extracts webpage content with `trafilatura`.
+- Extracts YouTube metadata and subtitles with `yt-dlp`; it never downloads video files.
+- Calls the selected summarizer provider.
+- Writes the final note and updates success/failure/retry state.
+- Emits `worker_started`, `extraction_started`, `summarizer_started`, `summarizer_completed`, `processing_succeeded`, and `processing_failed` activity events.
 
 ## Event Schema
 
@@ -104,13 +81,10 @@ Final readable knowledge remains Markdown in Obsidian.
   "schema_version": 1,
   "source": {
     "browser": "chrome",
-    "extension": "obsidian-bookmark-intelligence",
-    "profile_id": "59f3d6e1-3fb8-4dd1-b991-252f7bd2a9b2"
+    "extension": "bookmark-intelligence",
+    "profile_id": "profile-uuid"
   },
-  "event": {
-    "type": "created",
-    "timestamp": "2026-08-11T03:30:00Z"
-  },
+  "event": {"type": "created", "timestamp": "2026-08-11T03:30:00Z"},
   "bookmark": {
     "id": "23891",
     "parentId": "123",
@@ -122,100 +96,69 @@ Final readable knowledge remains Markdown in Obsidian.
 }
 ```
 
-Event types:
-
-- `created`
-- `changed`
-- `moved`
-- `removed`
+Event types are `created`, `changed`, `moved`, and `removed`. Browser/profile/bookmark identity is kept separate; processing identity is the canonical URL.
 
 ## SQLite Schema
 
-The queue database is stored inside the vault state directory.
+SQLite is an internal queue, not a user-facing knowledge database.
 
 ### `bookmark_events`
 
-Append-only event log mirror.
-
-| column | type | notes |
-| --- | --- | --- |
-| `id` | integer primary key | local event id |
-| `received_at` | text | UTC timestamp |
-| `browser` | text | chrome/firefox/unknown |
-| `profile_id` | text | browser profile or extension installation id |
-| `event_type` | text | created/changed/moved/removed |
-| `bookmark_id` | text | browser bookmark id |
-| `payload_json` | text | compact original event |
+Append-only event mirror: `id`, `received_at`, `browser`, `profile_id`, `event_type`, `bookmark_id`, `payload_json`.
 
 ### `bookmarks`
 
-Current local bookmark view by browser, profile id, and bookmark id.
-
-| column | type | notes |
-| --- | --- | --- |
-| `browser` | text | part of primary key |
-| `profile_id` | text | part of primary key |
-| `bookmark_id` | text | part of primary key |
-| `url` | text | original URL |
-| `canonical_url` | text | normalized URL |
-| `title` | text | browser title |
-| `parent_id` | text | browser folder id |
-| `status` | text | active/removed |
-| `updated_at` | text | UTC timestamp |
+Current browser state: `browser`, `profile_id`, `bookmark_id`, `url`, `canonical_url`, `title`, `parent_id`, `status`, `updated_at`.
 
 ### `resources`
 
-Deduplicated processing targets.
-
-| column | type | notes |
-| --- | --- | --- |
-| `id` | integer primary key | local resource id |
-| `canonical_url` | text unique | dedupe key |
-| `url` | text | preferred original URL |
-| `resource_type` | text | webpage/youtube/unknown |
-| `title` | text | latest known title |
-| `process_status` | text | pending/processing/succeeded/failed/skipped |
-| `retry_count` | integer | failed attempts |
-| `next_retry_at` | text | UTC timestamp |
-| `last_error` | text | compact error |
-| `content_hash` | text | extracted-content hash |
-| `markdown_path` | text | written Obsidian note path |
-| `created_at` | text | UTC timestamp |
-| `updated_at` | text | UTC timestamp |
+Deduplicated processing targets: `canonical_url` (unique), `url`, `resource_type`, `title`, `process_status`, `retry_count`, `next_retry_at`, `last_error`, `content_hash`, `markdown_path`, timestamps.
 
 ### `resource_metadata`
 
-Compact extraction and recommendation result.
-
-| column | type | notes |
-| --- | --- | --- |
-| `resource_id` | integer primary key | references resources |
-| `metadata_json` | text | title, author, date, channel, duration, captions |
-| `summary` | text | compact summary |
-| `recommended_folder` | text | suggested folder |
-| `recommended_tags_json` | text | suggested tags |
-| `updated_at` | text | UTC timestamp |
+Compact extracted metadata and summary: `resource_id`, `metadata_json`, `summary`, timestamps. Legacy recommendation columns may remain for schema compatibility but are not emitted to Markdown or used by the worker.
 
 ## URL Canonicalization
 
 - Lowercase scheme and host.
-- Remove URL fragments.
-- Remove common tracking parameters, including `utm_*`, `fbclid`, `gclid`, `msclkid`, and similar noise.
-- Sort query parameters.
-- Use `w3lib.url.canonicalize_url` when available.
+- Remove fragments.
+- Remove common tracking parameters such as `utm_*`, `fbclid`, `gclid`, and `msclkid`.
+- Sort query parameters using `w3lib.url.canonicalize_url` when available.
+- Use the canonical URL as the unique queue key and the note filename hash.
 
-## Processing Flow
+## Processing and Retry Flow
 
-1. Browser fires a bookmark event.
-2. Extension sends event through Native Messaging.
-3. Native host appends `events.jsonl`.
-4. Native host upserts queue state.
-5. Worker extracts metadata/text.
-6. Worker summarizes with Ollama.
-7. Worker writes a Markdown note to Obsidian.
-8. Worker marks the queue entry succeeded or failed with retry state.
+1. The browser emits an event.
+2. Native Messaging sends it to the local agent.
+3. The agent records the event and upserts the canonical resource.
+4. The worker claims a pending or due-retry resource.
+5. Extraction runs.
+6. The selected AI provider summarizes the compact source text. The extension settings page can change the provider, model, base URL, API-key environment variable name, entitlement endpoint, account ID, and access-token environment variable name; secret values remain environment variables and are never stored by the extension.
+7. The worker writes `bookmark--<hash>.md`.
+8. The resource becomes `succeeded`, or `failed` with `retry_count`, `next_retry_at`, and `last_error`.
 
-## Markdown Output
+If YouTube subtitles are unavailable, metadata and description can still be summarized. If extraction or the AI provider fails, no raw source is written to the Vault and the queue retries according to configuration.
+
+## AI Providers
+
+`[summarizer]` supports:
+
+- `ollama`: local `http://localhost:11434`, default model `qwen2.5:7b`.
+- `openai`: OpenAI-compatible `/chat/completions` endpoint.
+- `gemini`: Gemini `generateContent` endpoint.
+- `anthropic`: Anthropic Messages endpoint.
+- `hosted`: Bookmark Intelligence hosted gateway at `/v1/summarize`; the gateway checks entitlement, calls an OpenAI-compatible upstream, and consumes one hosted credit after a successful summary.
+- Other OpenAI-compatible providers by setting `provider` and `base_url` as appropriate.
+
+API keys are read only from the environment variable named by `api_key_env`. They are not written to SQLite, logs, prompts, or Markdown.
+
+## Entitlement Contract
+
+An optional `[entitlements]` service returns `plan`, `status`, `features`, and `expires_at` for an account. `refresh-entitlement` caches only those fields in OS app data. The access token is read from `access_token_env` and is never cached. Pro commands require their corresponding feature: `bulk_analysis`, `duplicate_report`, `backup`, or `restore`. An expired or inactive response is treated as Free. A development override is available only through the process environment variable `BOOKMARK_INTELLIGENCE_DEV_PRO=1`; user-editable TOML cannot grant Pro access.
+
+When an entitlement endpoint and access-token environment variable are configured, feature checks refresh a stale cache at most once every 15 minutes. A failed refresh falls back to the existing cache; an unconfigured endpoint never creates a network request.
+
+## Markdown Contract
 
 ```markdown
 ---
@@ -223,85 +166,41 @@ source_url: "https://example.com/article"
 canonical_url: "https://example.com/article"
 resource_type: "webpage"
 processed_at: "2026-08-11T03:30:00Z"
-recommended_folder: "AI/Reading"
-tags:
-  - bookmark
-  - ai
 ---
 
 # Interesting article
 
-## Summary
-
-...
-
-## Key Points
-
-- ...
-
-## Recommendation
-
-- Suggested folder: AI/Reading
-- Suggested tags: bookmark, ai
+핵심 요약입니다.
 ```
 
-## Multi-Profile Model
+Changing a bookmark title updates the same URL resource and note content. Removing a bookmark marks browser state as removed but does not delete a human-readable Obsidian note.
 
-Chrome and Firefox can have multiple profiles under the same Windows user account. Browser bookmark ids are not globally unique across profiles, so the extension stores a random local `profile_id` in extension storage and sends it with every event.
+## Notifications
 
-The local bookmark identity is:
+The default is browser notifications, not Windows desktop notifications. The extension polls `recent-activity`; the durable JSONL log remains in OS app data. Console output is also available from the worker.
 
-```text
-browser + profile_id + bookmark_id
-```
+## Pro Backup Contract
 
-The summary resource identity remains:
+`backup --output file.zip` creates a versioned ZIP containing `manifest.json`, a SQLite snapshot, the summary prompt, AI connection settings, and approved app-state files. It never archives the configured Vault directory or API key values. `restore --input file.zip` validates the format and Vault identity before replacing the local SQLite snapshot and approved state files. The worker should be stopped during restore.
 
-```text
-canonical_url
-```
-
-This keeps browser profile state separate while still deduplicating the same URL into one Obsidian summary note.
-
-## Browser Notification Model
-
-The worker does not show Windows notifications by default. Instead:
-
-1. The worker writes progress to `D:\obsidian\.bookmark-agent\activity.jsonl`.
-2. The extension uses the `alarms` permission to poll `recent-activity` through Native Messaging.
-3. The extension uses the `notifications` permission to show browser notifications for queued, succeeded, and failed processing.
-
-This keeps user-visible notifications inside Chrome/Firefox while preserving Obsidian `_Activity.md` as the durable activity log.
+`duplicate-report` groups bookmarks by canonical URL and returns the browser/profile/folder locations. It is read-only and never deletes or moves bookmarks.
 
 ## Security Model
 
-- The extension only requests `bookmarks`, `nativeMessaging`, `storage`, `notifications`, and `alarms`.
+- Extension permissions are limited to bookmarks, nativeMessaging, storage, notifications, and alarms.
 - The extension has no filesystem access.
-- The local agent writes only under the configured vault path for notes/state.
-- Native Messaging registration is explicit in HKCU registry keys.
-- Ollama is called locally.
-- Video files and full webpage archives are not stored.
-- Automatic bookmark movement remains disabled unless explicitly enabled later.
+- The Native Host is installed explicitly for the current user.
+- API keys stay in environment variables.
+- Full pages, videos, and raw transcripts are not stored in the Vault.
+- Automatic browser-folder movement is not enabled.
 
 ## Execution Order
 
-1. Install dependencies.
-2. Generate `config.toml` for `D:\obsidian`.
-3. Build extension artifacts and native host executable.
-4. Register Chrome/Firefox native hosts.
-5. Load extension in Chrome/Firefox.
-6. Run `bookmark-agent --config .\config.toml doctor`.
-7. Run `bookmark-agent --config .\config.toml worker`.
-8. Create or edit a bookmark and confirm Markdown appears in `D:\obsidian\Bookmarks`.
+1. Run `install.ps1` on Windows or `install.sh` on Linux/macOS.
+2. Configure the Vault path and `[summarizer]` provider.
+3. Install/load the generated Chrome or Firefox extension.
+4. Run `bookmark-agent --config .\config.toml doctor`.
+5. Start the worker, or let the installer register its user startup service.
 
-On Windows, these steps can be automated with:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -VaultPath D:\obsidian
-```
-
-On Linux/macOS, these steps can be automated with:
-
-```bash
-./install.sh --vault-path "$HOME/Obsidian"
-```
+For a release ZIP installation, `scripts/update-release.ps1` or `scripts/update-release.sh` downloads the latest GitHub Release asset over HTTPS into a temporary directory and reruns the installer without replacing an existing `config.toml` or Vault notes.
+6. Create a bookmark and confirm one summary note appears under the configured notes folder.

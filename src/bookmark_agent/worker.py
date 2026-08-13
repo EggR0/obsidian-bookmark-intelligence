@@ -13,8 +13,7 @@ from .config import AppConfig
 from .database import transaction, utc_now
 from .extraction import extract_resource
 from .markdown import write_obsidian_note
-from .recommendations import derive_recommendations
-from .summarizer import summarize_with_ollama
+from .summarizer import summarize
 from .vault_state import state_dir
 
 
@@ -91,7 +90,7 @@ def process_resource(config: AppConfig, resource: dict) -> None:
         "Bookmark processing started",
         f"Starting {resource['resource_type']} extraction.",
         resource=resource,
-        details={"ollama_model": config.ollama.model},
+        details={"provider": config.summarizer.provider, "model": config.summarizer.model},
         notify=config.notifications.notify_on_start,
     )
 
@@ -101,7 +100,7 @@ def process_resource(config: AppConfig, resource: dict) -> None:
         "Extracting bookmark content",
         f"Using {'yt-dlp' if resource['resource_type'] == 'youtube' else 'trafilatura'} for source extraction.",
         resource=resource,
-        details={"ollama_model": config.ollama.model},
+        details={"provider": config.summarizer.provider, "model": config.summarizer.model},
     )
     extracted = extract_resource(resource["url"], resource["resource_type"])
     content_hash = hashlib.sha256(extracted.text.encode("utf-8")).hexdigest()
@@ -113,7 +112,8 @@ def process_resource(config: AppConfig, resource: dict) -> None:
         f"Extracted {len(extracted.text)} characters; metadata keys: {', '.join(sorted(extracted.metadata.keys()))}.",
         resource=resource,
         details={
-            "ollama_model": config.ollama.model,
+            "provider": config.summarizer.provider,
+            "model": config.summarizer.model,
             "extracted_title": extracted.title,
             "extracted_text_chars": len(extracted.text),
         },
@@ -121,24 +121,22 @@ def process_resource(config: AppConfig, resource: dict) -> None:
 
     record_activity(
         config,
-        "ollama_started",
-        "Ollama summary started",
-        f"Calling local Ollama model {config.ollama.model}.",
+        "summarizer_started",
+        "AI summary started",
+        f"Calling {config.summarizer.provider} model {config.summarizer.model}.",
         resource=resource,
-        details={"ollama_model": config.ollama.model},
+        details={"provider": config.summarizer.provider, "model": config.summarizer.model},
     )
-    summary = summarize_with_ollama(config, extracted.title, resource["url"], extracted.text)
+    summary = summarize(config, extracted.title, resource["url"], extracted.text)
 
     record_activity(
         config,
-        "ollama_completed",
-        "Ollama summary completed",
-        f"Model {config.ollama.model} returned {len(summary)} characters.",
+        "summarizer_completed",
+        "AI summary completed",
+        f"Model {config.summarizer.model} returned {len(summary)} characters.",
         resource=resource,
-        details={"ollama_model": config.ollama.model, "summary_chars": len(summary)},
+        details={"provider": config.summarizer.provider, "model": config.summarizer.model, "summary_chars": len(summary)},
     )
-
-    recommended_folder, recommended_tags = derive_recommendations(config, summary)
     markdown_path = write_obsidian_note(
         config,
         title=extracted.title or resource["title"] or resource["url"],
@@ -146,8 +144,6 @@ def process_resource(config: AppConfig, resource: dict) -> None:
         canonical_url=resource["canonical_url"],
         resource_type=resource["resource_type"],
         summary=summary,
-        recommended_folder=recommended_folder,
-        recommended_tags=recommended_tags,
     )
 
     now = utc_now()
@@ -182,8 +178,8 @@ def process_resource(config: AppConfig, resource: dict) -> None:
                 resource["id"],
                 json.dumps(extracted.metadata, ensure_ascii=False),
                 summary,
-                recommended_folder,
-                json.dumps(recommended_tags, ensure_ascii=False),
+                None,
+                json.dumps([], ensure_ascii=False),
                 now,
             ),
         )
@@ -192,13 +188,12 @@ def process_resource(config: AppConfig, resource: dict) -> None:
         config,
         "processing_succeeded",
         extracted.title or resource["title"] or "Bookmark processed",
-        f"Saved Obsidian note with model {config.ollama.model}.",
+        f"Saved Obsidian note with {config.summarizer.provider} model {config.summarizer.model}.",
         resource=resource,
         details={
-            "ollama_model": config.ollama.model,
+            "provider": config.summarizer.provider,
+            "model": config.summarizer.model,
             "markdown_path": str(markdown_path),
-            "recommended_folder": recommended_folder,
-            "recommended_tags": recommended_tags,
         },
         notify=config.notifications.notify_on_success,
     )
@@ -232,7 +227,7 @@ def mark_failed(config: AppConfig, resource: dict, error: Exception) -> None:
         resource.get("title") or "Bookmark processing failed",
         f"Attempt {retry_count}/{config.processing.max_retries} failed. Next retry: {next_retry.replace(microsecond=0).isoformat().replace('+00:00', 'Z')}.",
         resource=resource,
-        details={"ollama_model": config.ollama.model, "error": str(error)[:1000], "retry_count": retry_count},
+        details={"provider": config.summarizer.provider, "model": config.summarizer.model, "error": str(error)[:1000], "retry_count": retry_count},
         notify=config.notifications.notify_on_failure,
     )
 
@@ -243,8 +238,8 @@ def run_worker(config: AppConfig, once: bool = False, sleep_seconds: int = 10) -
             config,
             "worker_started",
             "Bookmark worker started",
-            f"Worker is running with Ollama model {config.ollama.model}.",
-            details={"ollama_model": config.ollama.model, "once": once},
+            f"Worker is running with {config.summarizer.provider} model {config.summarizer.model}.",
+            details={"provider": config.summarizer.provider, "model": config.summarizer.model, "once": once},
         )
         last_scan_at = 0.0
         while True:
@@ -265,7 +260,7 @@ def run_worker(config: AppConfig, once: bool = False, sleep_seconds: int = 10) -
                     "batch_started",
                     "Bookmark batch started",
                     f"Processing {len(resources)} queued resource(s).",
-                    details={"ollama_model": config.ollama.model, "resource_count": len(resources)},
+                    details={"provider": config.summarizer.provider, "model": config.summarizer.model, "resource_count": len(resources)},
                 )
             for resource in resources:
                 try:

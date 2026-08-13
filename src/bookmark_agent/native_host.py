@@ -6,7 +6,8 @@ import struct
 import sys
 
 from .bookmark_import import ImportFilters, import_bookmarks
-from .config import AppConfig
+from .config import AppConfig, runtime_settings_path, save_runtime_settings
+from .entitlements import current_plan, has_feature
 from .service import ingest_bookmark_event
 from .summarizer import DEFAULT_SUMMARY_PROMPT, prompt_path, read_summary_prompt, write_summary_prompt
 from .vault_state import state_dir
@@ -72,7 +73,16 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
             "vault_path": str(config.obsidian.vault_path),
             "database_path": str(config.database.path),
             "notes_subdir": config.obsidian.notes_subdir,
-            "ollama_model": config.ollama.model,
+            "provider": config.summarizer.provider,
+            "model": config.summarizer.model,
+            "base_url": config.summarizer.base_url,
+            "api_key_env": config.summarizer.api_key_env,
+            "entitlement_endpoint": config.entitlements.endpoint,
+            "account_id": config.entitlements.account_id,
+            "access_token_env": config.entitlements.access_token_env,
+            "runtime_settings_path": str(runtime_settings_path(config.obsidian.vault_path)),
+            "plan": current_plan(config),
+            "support_links": config.support.links,
             "summary_prompt": read_summary_prompt(config),
             "default_summary_prompt": DEFAULT_SUMMARY_PROMPT,
             "summary_prompt_path": str(prompt_path(config)),
@@ -80,19 +90,39 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
 
     if command == "save-agent-settings":
         prompt = message.get("summary_prompt")
-        if not isinstance(prompt, str):
-            return {"ok": False, "error": "summary_prompt must be a string"}
-        write_summary_prompt(config, prompt)
+        if prompt is not None:
+            if not isinstance(prompt, str):
+                return {"ok": False, "error": "summary_prompt must be a string"}
+            write_summary_prompt(config, prompt)
+        runtime_fields = {key: message[key] for key in ("provider", "model", "base_url", "api_key_env", "entitlement_endpoint", "account_id", "access_token_env") if key in message}
+        settings_path = None
+        if runtime_fields:
+            if not all(isinstance(value, str) for value in runtime_fields.values()):
+                return {"ok": False, "error": "AI settings must be strings"}
+            settings_path = save_runtime_settings(
+                config.obsidian.vault_path,
+                {
+                    "provider": config.summarizer.provider,
+                    "model": config.summarizer.model,
+                    "base_url": config.summarizer.base_url,
+                    "api_key_env": config.summarizer.api_key_env,
+                    "entitlement_endpoint": config.entitlements.endpoint,
+                    "account_id": config.entitlements.account_id,
+                    "access_token_env": config.entitlements.access_token_env,
+                    **runtime_fields,
+                },
+            )
         return {
             "ok": True,
             "command": command,
             "summary_prompt_path": str(prompt_path(config)),
+            "runtime_settings_path": str(settings_path or runtime_settings_path(config.obsidian.vault_path)),
         }
 
     if command == "import-bookmarks":
-        mode = message.get("mode") or "index"
-        if mode != "index":
-            return {"ok": False, "error": "Native import currently supports index mode only."}
+        if not has_feature(config, "bulk_analysis"):
+            return {"ok": False, "error": "Existing bookmark bulk analysis is a Pro feature."}
+        mode = message.get("mode") or "summarize"
         filters = ImportFilters(
             browser=message.get("browser"),
             profile=message.get("profile"),
@@ -121,7 +151,10 @@ def _handle_control_message(config: AppConfig, message: dict) -> dict | None:
         "vault_path": str(config.obsidian.vault_path),
         "database_path": str(config.database.path),
         "notes_subdir": config.obsidian.notes_subdir,
-        "ollama_model": config.ollama.model,
+        "provider": config.summarizer.provider,
+        "model": config.summarizer.model,
+        "plan": current_plan(config),
+        "support_links": config.support.links,
     }
 
 

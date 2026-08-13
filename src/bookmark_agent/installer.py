@@ -67,15 +67,17 @@ def write_config(path: Path, vault_path: Path, force: bool = False) -> None:
     vault_path_toml = str(vault_path).replace("\\", "\\\\")
     ollama_model = detect_ollama_model()
     content = f"""[database]
-path = "${{vault}}\\\\.bookmark-agent\\\\bookmark-agent.sqlite3"
+path = "${{state}}\\\\bookmark-agent.sqlite3"
 
 [obsidian]
 vault_path = "{vault_path_toml}"
 notes_subdir = "Bookmarks"
 
-[ollama]
+[summarizer]
+provider = "ollama"
 base_url = "http://localhost:11434"
 model = "{ollama_model}"
+api_key_env = ""
 timeout_seconds = 120
 
 [processing]
@@ -84,26 +86,36 @@ max_retries = 3
 retry_backoff_seconds = 300
 store_extracted_text_in_sqlite = false
 
-[auto_move]
-enabled = false
-
 [browser_scan]
-enabled = false
+enabled = true
 interval_seconds = 60
 
 [notifications]
 enabled = true
 desktop = false
 activity_log = true
-activity_note = true
+activity_note = false
 print_to_console = true
 notify_on_start = false
 notify_on_success = true
 notify_on_failure = true
 
-[recommendations]
-default_folder = "Inbox/Bookmarks"
-default_tags = ["bookmark"]
+[support]
+github = ""
+polar = ""
+ko_fi = ""
+buy_me_a_coffee = ""
+patreon = ""
+paypal = ""
+toss = ""
+custom = ""
+
+[entitlements]
+endpoint = ""
+account_id = ""
+access_token_env = "BOOKMARK_INTELLIGENCE_ACCESS_TOKEN"
+timeout_seconds = 10
+
 """
     path.write_text(content, encoding="utf-8")
 
@@ -111,7 +123,7 @@ default_tags = ["bookmark"]
 def native_manifest(browser: str, host_path: Path, chrome_extension_id: str | None = None) -> dict:
     manifest = {
         "name": HOST_NAME,
-        "description": "Obsidian Bookmark Intelligence native messaging host",
+        "description": "Bookmark Intelligence native messaging host",
         "path": str(host_path.resolve()),
         "type": "stdio",
     }
@@ -300,8 +312,8 @@ def doctor(config: AppConfig, project_root: Path) -> list[CheckResult]:
     results.append(CheckResult("State directory", config.database.path.parent.exists(), str(config.database.path.parent)))
     results.append(
         CheckResult(
-            "State under vault",
-            config.obsidian.vault_path in config.database.path.resolve().parents,
+            "State outside vault",
+            config.obsidian.vault_path not in config.database.path.resolve().parents,
             str(config.database.path),
         )
     )
@@ -309,20 +321,25 @@ def doctor(config: AppConfig, project_root: Path) -> list[CheckResult]:
     for module_name in ["requests", "trafilatura", "yt_dlp", "w3lib"]:
         results.append(CheckResult(f"Dependency {module_name}", True, "importable"))
 
-    try:
-        response = requests.get(f"{config.ollama.base_url}/api/tags", timeout=3)
-        results.append(CheckResult("Ollama", response.ok, f"{config.ollama.base_url}/api/tags -> {response.status_code}"))
-        if response.ok:
-            models = [model.get("name") for model in response.json().get("models", [])]
-            results.append(
-                CheckResult(
-                    "Ollama model",
-                    config.ollama.model in models,
-                    f"{config.ollama.model} installed; available={', '.join(models) or 'none'}",
+    results.append(CheckResult("AI provider", bool(config.summarizer.provider), config.summarizer.provider))
+    if config.summarizer.provider == "ollama":
+        try:
+            response = requests.get(f"{config.summarizer.base_url}/api/tags", timeout=3)
+            results.append(CheckResult("Ollama", response.ok, f"{config.summarizer.base_url}/api/tags -> {response.status_code}"))
+            if response.ok:
+                models = [model.get("name") for model in response.json().get("models", [])]
+                results.append(
+                    CheckResult(
+                        "Ollama model",
+                        config.summarizer.model in models,
+                        f"{config.summarizer.model} installed; available={', '.join(models) or 'none'}",
+                    )
                 )
-            )
-    except Exception as error:
-        results.append(CheckResult("Ollama", False, f"{config.ollama.base_url} unavailable: {error}"))
+        except Exception as error:
+            results.append(CheckResult("Ollama", False, f"{config.summarizer.base_url} unavailable: {error}"))
+    else:
+        key_name = config.summarizer.api_key_env
+        results.append(CheckResult("AI API key", bool(key_name and os.environ.get(key_name)), key_name or "not configured"))
 
     host_exe = project_root / "outputs" / "bookmark-agent-native.exe"
     host_cmd = project_root / "outputs" / "bookmark-agent-native.cmd"

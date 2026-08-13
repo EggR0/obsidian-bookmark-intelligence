@@ -1,0 +1,9 @@
+{
+  "id": "bookmark-intelligence",
+  "name": "Bookmark Intelligence",
+  "version": "0.2.24",
+  "minAppVersion": "1.4.0",
+  "description": "View local bookmark processing activity and run the Bookmark Intelligence agent from Obsidian.",
+  "author": "Bookmark Intelligence",
+  "isDesktopOnly": true
+}

@@ -1,18 +1,28 @@
-# Store Submission Guide
+# Bookmark Intelligence Store Submission Guide
 
 This project can produce Chrome Web Store and Firefox Add-ons packages, but the final public listing requires store developer accounts, upload, review, and approval.
+
+It also produces an Obsidian community-plugin package. Obsidian publication still requires a public repository, plugin manifest review, and acceptance by the Obsidian community plugins process.
 
 ## What Is Ready
 
 - Chrome extension ZIP: `outputs/chrome-extension.zip`
 - Firefox extension XPI: `outputs/firefox-extension.xpi`
+- Obsidian plugin ZIP: `outputs/obsidian-bookmark-intelligence-plugin.zip`
+- Obsidian plugin metadata: `obsidian-plugin/manifest.json` and `obsidian-plugin/versions.json`
 - Extension options page: `options.html`
 - Browser notifications: `notifications` and `alarms`
 - Native Messaging permission and local agent bridge
-- Local agent download button pointing to GitHub Releases
-- Store-safe local-first design: no hosted summarization service, no advertising, no daily quota service
+- Local agent download button for the latest GitHub Release Windows bundle
+- Store-safe local-first design: no advertising and no daily quota in the local/Ollama path
 
 ## What Still Requires Store Accounts
+
+Obsidian community plugins:
+
+1. Keep the plugin source in a public GitHub repository.
+2. Submit the repository through the Obsidian community plugins submission process.
+3. Complete review and wait for acceptance before claiming marketplace availability.
 
 Chrome Web Store:
 
@@ -32,7 +42,7 @@ Firefox Add-ons:
 
 ## Important Native Messaging Note
 
-The browser extension cannot silently install or run the local Python/native agent from a web store listing. Users must install the local agent separately. This extension provides a `Get local agent` button that opens the GitHub Releases page where the local installer and packages are available.
+The browser extension cannot silently install or run the local Python/native agent from a web store listing. Users must install the local agent separately. This extension provides a `Get local agent` button that downloads the latest Windows bundle; the user then runs `install.ps1` once.
 
 ## Hardware Requirements Disclosure
 
@@ -61,7 +71,7 @@ The default configuration uses qwen2.5:7b when available. Users may choose a sma
 Name:
 
 ```text
-Obsidian Bookmark Intelligence
+Bookmark Intelligence
 ```
 
 Short description:
@@ -73,18 +83,18 @@ Local-first Chrome/Firefox bookmark intelligence pipeline for Obsidian.
 Full description:
 
 ```text
-Obsidian Bookmark Intelligence captures Chrome and Firefox bookmark changes, sends them to a local Native Messaging agent, deduplicates canonical URLs, and writes compact Markdown summaries into an Obsidian vault.
+Bookmark Intelligence captures Chrome and Firefox bookmark changes, sends them to a local Native Messaging agent, deduplicates canonical URLs, and writes compact Markdown summaries into an Obsidian vault.
 
-The extension is local-first. It does not use advertising-backed bookmark services or daily quota summarization services by default. Webpage extraction is handled by the local agent with trafilatura. YouTube metadata and captions are handled with yt-dlp without downloading video files. Summaries are generated through a local Ollama model.
+The extension is local-first. It does not use advertising-backed bookmark services or daily quota summarization services in the default local path. Webpage extraction is handled by the local agent with trafilatura. YouTube metadata and captions are handled with yt-dlp without downloading video files. Summaries are generated through a local Ollama model by default, with optional user-configured AI APIs.
 
 The extension includes:
 - Real-time bookmark event capture
 - Native Host connection test
-- Existing bookmark index preview
-- Existing bookmark index creation in Obsidian
+- Optional Pro bulk analysis of existing bookmarks through the local queue
 - Browser notifications for queued, succeeded, and failed processing
 - Settings page for notification and local agent download settings
 - Editable local summary prompt with variables for title, URL, and source text
+- Options-page controls to preview or queue existing bookmarks for Pro bulk analysis
 
 The local agent must be installed separately from GitHub Releases. Local summarization requires Ollama and hardware capable of running the selected local model.
 ```
@@ -99,8 +109,9 @@ Permissions explanation:
 
 ```text
 bookmarks: read bookmark changes and existing bookmark trees.
-nativeMessaging: communicate with the locally installed Obsidian Bookmark Intelligence agent.
+nativeMessaging: communicate with the locally installed Bookmark Intelligence agent.
 storage: store extension profile id, settings, and last notification cursor.
+downloads: download the user-requested local agent installation bundle.
 notifications: show browser notifications for queued/completed/failed work.
 alarms: poll local activity status while the browser is running.
 ```
@@ -128,7 +139,7 @@ Use of bookmark data is limited to providing the user-facing bookmark-to-Obsidia
 Remote code:
 
 ```text
-The extension package does not load remote code. The Get local agent button opens the project's GitHub Releases page so the user can download the separately installed local agent.
+The extension package does not load remote code. The Get local agent button downloads a user-requested static installation archive from the project's GitHub Releases asset URL.
 ```
 
 ## Firefox Add-ons Data Disclosure Draft
