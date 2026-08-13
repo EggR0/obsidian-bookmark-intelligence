@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Bookmark Intelligence privacy and permissions.">
+  <title>Privacy | Bookmark Intelligence</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar"><a class="brand" href=".">Bookmark Intelligence</a><nav aria-label="Primary navigation"><a href=".">Install</a><a href="privacy.html">Privacy</a><a href="https://github.com/EggR0/obsidian-bookmark-intelligence">Source</a></nav></header>
+  <main>
+    <section class="hero compact"><p class="eyebrow">Privacy and permissions</p><h1>Local by default.</h1><p class="lede">Bookmark Intelligence sends bookmark events to the Native Messaging agent installed on your computer. The browser extension does not send bookmark data to a developer-operated remote service.</p></section>
+    <section class="section" aria-labelledby="data-title"><p class="eyebrow">Data handling</p><h2 id="data-title">What the extension handles</h2><div class="prose"><p>The extension may read bookmark titles, URLs, folder identifiers, event types, and a local extension profile identifier. It uses these values only to provide bookmark capture and Obsidian summary functionality.</p><p>The local agent may fetch webpage text or YouTube metadata and captions when processing is requested. It does not download or store YouTube video files. Final notes contain compact summaries, not full webpages, videos, or raw transcripts.</p><p>SQLite queue state, activity logs, prompts, and provider connection settings are kept outside the Vault in the operating system application-data directory. API keys and access tokens are read from environment variables and are not stored by the extension, SQLite, or Markdown notes.</p></div></section>
+    <section class="section" aria-labelledby="permissions-title"><p class="eyebrow">Permissions</p><h2 id="permissions-title">Why each permission exists</h2><dl class="permission-list"><dt>bookmarks</dt><dd>Observe bookmark creation, edits, moves, and removals.</dd><dt>nativeMessaging</dt><dd>Send compact bookmark events to the locally installed agent.</dd><dt>storage</dt><dd>Keep extension profile and notification cursor settings.</dd><dt>notifications</dt><dd>Show queued, completed, and failed processing updates in the browser.</dd><dt>alarms</dt><dd>Poll local activity while the browser is running.</dd><dt>downloads</dt><dd>Download the user-requested local agent release bundle.</dd></dl></section>
+    <section class="section compact"><p class="eyebrow">User control</p><h2>Nothing is hidden</h2><p>Users can disable notifications, stop the worker, remove the Native Messaging manifest, edit the local configuration, delete app state, or uninstall the extension. Optional remote AI providers are controlled by the user and follow their own privacy terms.</p></section>
+  </main>
+  <footer class="footer"><a href=".">Back to installation</a><a href="https://github.com/EggR0/obsidian-bookmark-intelligence/issues">Support and issues</a></footer>
+</body>
+</html>
